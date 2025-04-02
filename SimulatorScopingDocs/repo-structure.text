@@ -1,0 +1,32 @@
+market-entry-simulator/
+├── .github/                    # GitHub Actions workflows
+├── src/
+│   ├── app/                    # Next.js 13+ App Router
+│   │   ├── layout.tsx         # Root layout with Tailwind/DaisyUI
+│   │   ├── page.tsx           # Home page with input form
+│   │   ├── simulation/        # Simulation results page
+│   │   │   └── page.tsx
+│   │   └── api/               # API routes
+│   │       └── simulate/      # Simulation endpoint
+│   │           └── route.ts
+│   ├── components/            # Reusable components
+│   │   ├── ui/               # UI components
+│   │   │   ├── Button.tsx
+│   │   │   ├── Card.tsx
+│   │   │   └── Input.tsx
+│   │   └── simulation/       # Simulation-specific components
+│   │       ├── InputForm.tsx
+│   │       ├── ResultsDashboard.tsx
+│   │       └── ProgressIndicator.tsx
+│   ├── lib/                   # Utility functions and shared logic
+│   │   ├── simulation.ts     # Simulation logic
+│   │   └── types.ts          # TypeScript types
+│   └── styles/               # Global styles
+├── public/                   # Static assets
+├── .env.example             # Example environment variables
+├── .gitignore
+├── README.md
+├── package.json
+├── tailwind.config.js
+├── postcss.config.js
+└── tsconfig.json
