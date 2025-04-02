@@ -1,14 +1,14 @@
+import type { SimulationInput, SimulationResult } from "@/lib/types";
 import OpenAI from "openai";
-import type { SimulationInput } from "./types";
 
 /**
- * Generates business scenarios based on company info and market challenge
+ * Generates 10 high-impact solutions based on company info and market challenge
  */
 async function generateBusinessScenarios(
 	client: OpenAI,
 	input: SimulationInput,
 ): Promise<string> {
-	const prompt = `Based on the following company information and market challenge, generate 3 different business scenarios for market entry. Each scenario should represent a distinct approach to entering the market.
+	const prompt = `Based on the following company information and market challenge, generate 10 high-impact solutions for market entry. Each solution should represent a distinct approach to entering the market.
 
 Company Information:
 ${input.companyInfo}
@@ -16,19 +16,19 @@ ${input.companyInfo}
 Market Challenge:
 ${input.marketChallenge}
 
-Generate 3 different scenarios that include:
+Generate 10 different solutions that include:
 1. A unique title and description
 2. Key advantages of this approach
 3. Potential challenges or risks
 4. Estimated timeline for implementation
 5. Required resources or investments
 
-Format each scenario clearly with:
-- A numbered heading (e.g., "Scenario 1: [Title]")
+Format each solution clearly with:
+- A numbered heading (e.g., "Solution 1: [Title]")
 - Clear sections for description, advantages, challenges, timeline, and resources
 - Bullet points for lists
 
-IMPORTANT: Focus on providing clear, detailed scenarios without any JSON formatting.`;
+IMPORTANT: Focus on providing clear, detailed solutions without any JSON formatting.`;
 
 	try {
 		const response = await client.chat.completions.create({
@@ -37,14 +37,14 @@ IMPORTANT: Focus on providing clear, detailed scenarios without any JSON formatt
 				{
 					role: "system",
 					content:
-						"You are a strategic business consultant specializing in market entry strategies. Provide detailed, practical scenarios that consider both opportunities and risks.",
+						"You are a strategic business consultant specializing in market entry strategies. Provide detailed, practical solutions that consider both opportunities and risks.",
 				},
 				{ role: "user", content: prompt },
 			],
 			temperature: 0.7,
 		});
 
-		return response.choices[0].message.content || "No scenarios generated";
+		return response.choices[0].message.content || "No solutions generated";
 	} catch (error) {
 		console.error("Error generating business scenarios:", error);
 		throw new Error("Failed to generate business scenarios");
@@ -52,7 +52,7 @@ IMPORTANT: Focus on providing clear, detailed scenarios without any JSON formatt
 }
 
 /**
- * Generates market personas based on company info and market challenge
+ * Generates 6 market personas (3 current + 3 new) based on company info and market challenge
  */
 async function generateMarketPersonas(
 	client: OpenAI,
@@ -81,6 +81,7 @@ Format each persona clearly with:
 - Clear sections for each piece of information
 - Bullet points for lists
 - Include their market segment and adoption likelihood at the top
+- Clearly label which personas are from current audience vs. new audiences
 
 IMPORTANT: Focus on providing clear, detailed personas without any JSON formatting.`;
 
@@ -106,86 +107,25 @@ IMPORTANT: Focus on providing clear, detailed personas without any JSON formatti
 }
 
 /**
- * Generates feedback from personas for each business scenario
- */
-async function generateScenarioFeedback(
-	client: OpenAI,
-	scenarios: string,
-	personas: string,
-	input: SimulationInput,
-): Promise<string> {
-	const prompt = `Based on the following scenarios and personas, generate detailed feedback about how each persona would react to each proposed market entry strategy.
-
-SCENARIOS:
-${scenarios}
-
-PERSONAS:
-${personas}
-
-For each persona, analyze their reaction to each scenario, including:
-1. Initial reaction to the scenario
-2. Specific concerns or worries
-3. Likely use cases
-4. Suggested improvements
-5. Expected adoption timeframe
-6. Price expectations
-7. Overall sentiment (positive, neutral, or negative)
-
-Format the feedback clearly with:
-- A heading for each persona (e.g., "Feedback from [Persona Name]")
-- Subheadings for each scenario (e.g., "Reaction to [Scenario Title]")
-- Clear sections for each type of feedback
-- Bullet points for lists
-
-IMPORTANT: Focus on providing clear, detailed feedback without any JSON formatting.`;
-
-	try {
-		const response = await client.chat.completions.create({
-			model: "gpt-4",
-			messages: [
-				{
-					role: "system",
-					content:
-						"You are a market research expert analyzing how different personas would react to business scenarios. Provide detailed, realistic feedback.",
-				},
-				{ role: "user", content: prompt },
-			],
-			temperature: 0.7,
-		});
-
-		return response.choices[0].message.content || "No feedback generated";
-	} catch (error) {
-		console.error("Error generating scenario feedback:", error);
-		throw new Error("Failed to generate scenario feedback");
-	}
-}
-
-/**
  * Main simulation function that orchestrates the multi-step process
  */
-export async function runSimulation(input: SimulationInput): Promise<{
-	scenarios: string;
-	personas: string;
-	feedback: string;
-}> {
+export async function runSimulation(
+	input: SimulationInput,
+): Promise<SimulationResult> {
 	const client = new OpenAI({
 		apiKey: input.apiKey,
 	});
 
 	try {
-		// Step 1: Generate business scenarios
+		// Step 1: Generate 10 high-impact solutions
 		const scenarios = await generateBusinessScenarios(client, input);
 
-		// Step 2: Generate market personas
+		// Step 2: Generate 6 market personas (3 current + 3 new)
 		const personas = await generateMarketPersonas(client, input);
 
-		// Step 3: Generate feedback for each scenario-persona combination
-		const feedback = await generateScenarioFeedback(
-			client,
-			scenarios,
-			personas,
-			input,
-		);
+		// For now, return a placeholder for feedback
+		const feedback =
+			"Feedback and analysis will be generated in the next phase.";
 
 		return {
 			scenarios,

@@ -1,73 +1,247 @@
-# Market Entry Strategy Simulator - Product Requirements Document (PRD)
+Market Entry Strategy Simulator – PRD
+1. Overview
+Product Name: Market Entry Strategy Simulator
+Purpose:
+Empower business strategists, product managers, and entrepreneurs to brainstorm, evaluate, and categorize potential solutions for a market challenge. The simulator uses multi-step LLM prompts to generate high-impact solutions, define user personas, and assess solution risk and success factors.
 
-## 1. Product Overview
-**Product Name:** Market Entry Strategy Simulator  
-**Purpose:**  
-Enable business strategists to evaluate new market opportunities by simulating consumer behavior responses using a multi-step, LLM-powered simulation process. This tool combines qualitative insights with actionable recommendations for market entry.  
-**Target Users:**  
-- Business Executives & Strategists  
-- Product Managers  
-- Market Researchers
+Scope:
 
-## 2. Goals and Objectives
-- **Rapid Market Analysis:** Allow users to quickly generate strategic insights for new market entry.
-- **LLM-Driven Multi-Step Simulation:** Leverage OpenAI’s language models in a multi-step process to provide detailed consumer segmentation, behavior prediction, and strategic recommendations.
-- **User-Friendly Experience:** Provide a simple interface with minimal inputs, focusing on a rich simulation experience.
-- **Actionable Insights:** Deliver clear, comprehensive simulation outputs that include consumer segmentation, adoption trends, competitive analysis, and strategic advice.
+Frontend: A Next.js (or similar) single-page web application with minimal input fields and a dynamic results dashboard.
 
-## 3. Key Features
-- **Input Interface:**
-  - **OpenAI API Key:** A secure field for users to input their API key.
-  - **Current Company Information:** A free-form text box to describe the company’s core business, size, and funding status.
-  - **New Market Challenge Description:** A free-form text box to detail the new market entry opportunity or challenge.
-  
-- **Multi-Step Simulation Engine:**
-  - **Step 1: Composite Prompt Generation:**  
-    The system combines company details and market challenge into a composite prompt instructing the LLM to act as a market research analyst.
-  - **Step 2: Consumer Segmentation and Initial Insights:**  
-    The LLM generates a high-level overview including segmentation of consumers (e.g., early adopters, price-sensitive, quality-focused) and outlines initial market trends.
-  - **Step 3: Iterative Deep-Dive per Segment:**  
-    For each consumer segment identified, the system issues follow-up prompts to generate detailed behavior predictions, adoption curves, and tailored strategic recommendations.
-  - **Aggregation:**  
-    The system collates the outputs into a unified, actionable simulation report.
+Backend: Serverless API routes or minimal backend logic that orchestrates multiple OpenAI calls, aggregates data, and returns structured results to the frontend.
 
-- **Results Visualization and Reporting:**
-  - **Interactive Dashboard:**  
-    A dashboard to display the overall simulation summary and allow drill-downs into individual consumer segment details.
-  - **Visual Aids:**  
-    Use of simple charts or graphs (e.g., adoption curves, segment distribution) to enhance understanding.
-  - **Export Options:**  
-    Ability to download the simulation results as a PDF or Excel report.
+LLM Integration: Uses user-provided OpenAI API key for prompt execution.
 
-## 4. Core User Views (for low-fi wireframes)
-1. **Home Input View:**  
-   - **Header:** Brief description of the simulator.
-   - **Input Forms:**  
-     - OpenAI API Key input (masked)
-     - Current Company Information (text area with example placeholder)
-     - New Market Challenge Description (text area with guidance)
-   - **Action Button:** “Run Simulation”
+2. Key Objectives & Success Criteria
+Rapid Ideation: Quickly generate 10 potential high-impact solutions for the user’s market challenge.
 
-2. **Simulation Progress View:**  
-   - **Progress Indicator:** Visual cue (spinner or progress bar) showing simulation stages (Composite Prompt, Segmentation, Detailed Analysis).
-   - **Status Updates:** Textual updates on current simulation step.
+Persona Analysis: Create 6 user personas (3 existing customer personas + 3 new customer personas) to evaluate each solution’s risk and potential.
 
-3. **Results Dashboard View:**  
-   - **Overview Panel:** Aggregated simulation summary with key insights.
-   - **Segment Detail Panels:** Expandable sections for each consumer segment displaying detailed predictions, adoption curves, and recommendations.
-   - **Visuals:** Simple charts or graphs integrated in each panel.
-   - **Export Button:** Option to download the full report.
+Risk & Success Categorization: Classify solutions into “Most Risky Bet,” “Most Likely to Succeed,” and “Wildcard” to aid strategic decision-making.
 
-4. **Detailed Report View (Optional):**  
-   - A page or modal that presents a comprehensive, printable simulation report.
+Clear, Actionable Output: Present final analysis in a user-friendly dashboard, with persona-based feedback for each solution.
 
-## 5. Success Metrics
-- **User Engagement:** Frequency of simulation runs and positive qualitative feedback.
-- **Actionable Insights:** Reports being used in strategy sessions.
-- **Performance:** Minimal latency in simulation results even during multi-step processing.
-- **Adoption:** Broad internal use across strategy and market research teams.
+Success Metrics:
 
-## 6. Constraints and Dependencies
-- **API Dependency:** Relies on user-provided OpenAI API keys and their rate limits.
-- **Data Privacy:** No persistent storage of user inputs; transient data handling.
-- **Scope:** Focused on market entry simulation for the first release, with potential for future expansion to additional business scenarios.
+User Engagement: Number of completed simulations, time spent reviewing solutions.
+
+Solution Quality: Positive user feedback on the relevance and usefulness of generated solutions.
+
+Performance: End-to-end simulation completion under an acceptable time (e.g., < 30 seconds).
+
+Adoption: Repeated usage by the same user or broad usage across multiple stakeholders.
+
+3. User Stories
+As a Business Strategist:
+I want to see a variety of potential solutions to a market challenge, so I can select and refine the best ideas to implement.
+
+As a Product Manager:
+I want to understand different user personas and their perceptions of each solution, so I can prioritize features and messaging.
+
+As a Startup Founder:
+I want quick, AI-driven insights on how risky or successful each solution might be, so I can make informed decisions with limited resources.
+
+4. Flow & Logic
+4.1. Step-by-Step Process
+User Input Page (Already Built)
+
+Fields: Company Information, Market Challenge, OpenAI API Key.
+
+Action: “Run Simulation” button triggers the multi-step simulation flow.
+
+Generate 10 Potential High-Impact Solutions
+
+Prompt:
+
+less
+Copy
+You are a market strategist. Given the following:
+- Company Details: [User’s Input]
+- Market Challenge: [User’s Input]
+
+Brainstorm 10 high-impact solutions that address this challenge.
+Backend/LLM Logic:
+
+Receive user inputs.
+
+Construct the composite prompt.
+
+Call OpenAI API with the user’s API key.
+
+Return the 10 solutions to the frontend.
+
+UI:
+
+Show a progress indicator: “Brainstorming 10X solutions…”
+
+After success, briefly display: “Running solutions through simulations to assess scenarios & user feedback…”
+
+Generate 6 User Personas (3 Current + 3 New)
+
+Prompt:
+
+sql
+Copy
+Based on the company details and the new solutions,
+create 6 user personas:
+  - 3 personas representing current customers
+  - 3 personas representing new customer segments
+Provide a one-line description of each persona’s profile and how they might react to the new solutions.
+Backend/LLM Logic:
+
+Construct persona prompt.
+
+Call OpenAI with user’s API key.
+
+Return the 6 personas to the frontend.
+
+UI:
+
+Progress indicator: “Simulating user personas…”
+
+After success, display: “Generating final solutions analysis…”
+
+Persona Feedback & Risk Analysis
+
+Objective: For each of the 10 solutions, gather persona-specific feedback and compute a risk score.
+
+Approach:
+
+Iterative LLM Calls: For each solution, ask the LLM to generate feedback from each persona and a numeric risk score (0–100%).
+
+yaml
+Copy
+For the following solution: [Solution #]
+Given the following personas:
+- Persona 1: [Description]
+- Persona 2: [Description]
+...
+Provide:
+1. A one-line feedback from each persona.
+2. A risk score (0–100%) reflecting how risky this solution is.
+Data Aggregation: Summarize each solution’s feedback and average risk score.
+
+Example formula: Average Risk = (Risk_Persona1 + Risk_Persona2 + ... + Risk_Persona6) / 6.
+
+Categorize Solutions
+
+Logic:
+
+Most Risky Bet: Highest average risk score.
+
+Most Likely to Succeed: Lowest average risk score or highest “success” indicator.
+
+Wildcard: Highest variance or mixed persona feedback.
+
+Optional LLM Summarization: Provide final summary prompt to confirm categorization:
+
+diff
+Copy
+Here are the solutions, their average risk, and persona feedback.
+Please categorize them as:
+- Most Risky Bet
+- Most Likely to Succeed
+- Wildcard
+Provide a one-line rationale for each categorization.
+UI:
+
+Show final results with 3 highlighted solutions (risky, likely, wildcard) and a list of all solutions for further exploration.
+
+5. Detailed Features & UI Components
+Progress Indicators
+
+Show transitions for each step:
+
+“Brainstorming 10X solutions…”
+
+“Running solutions through simulations…”
+
+“Simulating user personas…”
+
+“Generating final solutions analysis…”
+
+Final Results Dashboard
+
+High-Level Summary: Summarize the 10 solutions, highlight the top 3 categories.
+
+Detailed View: For each solution, display:
+
+Title/Brief Description
+
+Average Risk Score (0–100%)
+
+Persona Feedback (one line per persona)
+
+Categorized Sections:
+
+Most Risky Bet
+
+Most Likely to Succeed
+
+Wildcard
+
+Expandable Panels or a table layout to allow users to click on any solution and see more details (including each persona’s feedback).
+
+Export Option (Future Enhancement)
+
+Provide an export button to download the final analysis as a PDF or CSV.
+
+6. Constraints & Dependencies
+OpenAI API:
+
+Requires user’s own API key; must handle rate limits and potential errors.
+
+Must ensure prompts remain within token limits.
+
+No Persistent Storage (initially):
+
+Data is ephemeral; no user authentication or saved sessions.
+
+If usage grows, consider storing user scenarios in a database for historical reference.
+
+Performance:
+
+Multiple sequential LLM calls (especially for 10 solutions x 6 personas = up to 60 sub-calls) could lead to noticeable wait times.
+
+Could mitigate by parallelizing calls or summarizing in fewer total prompts.
+
+7. Error Handling & Edge Cases
+Invalid API Key: Prompt user to re-enter a valid key.
+
+Excessive Token Usage: Break down large prompts into smaller ones or reduce the detail.
+
+LLM Timeout or Rate Limit: Show a user-friendly message, possibly re-try.
+
+No Solutions Returned: Provide fallback messaging if the LLM fails or returns incomplete data.
+
+8. Future Enhancements
+Advanced Configuration: Allow users to tweak risk scoring method or prompt parameters (temperature, max tokens).
+
+Interactive “What-If”: Let users modify solutions or persona details mid-simulation and re-run.
+
+Additional Segmentation: Generate more refined personas or competitor analysis.
+
+Authentication & Persistence: Let users save or revisit past simulations in a secure environment.
+
+9. Timeline & Milestones
+Milestone 1: Basic UI & Single-Prompt Flow
+
+Implement user input form (already done).
+
+Generate 10 solutions and display them.
+
+Milestone 2: Persona Generation & Risk Analysis
+
+Implement persona creation step.
+
+Collect risk scores and persona feedback for each solution.
+
+Milestone 3: Categorization & Final Dashboard
+
+Aggregate data, highlight risky/likely/wildcard solutions.
+
+Build final results UI.
+
+Milestone 4: Polishing & Error Handling
+
+Add robust error handling, UI enhancements, and possible export features.
