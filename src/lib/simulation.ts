@@ -2,13 +2,13 @@ import type { SimulationInput, SimulationResult } from "@/lib/types";
 import OpenAI from "openai";
 
 /**
- * Generates 10 high-impact solutions based on company info and market challenge
+ * Generates 5 high-impact solutions based on company info and market challenge
  */
 async function generateBusinessScenarios(
 	client: OpenAI,
 	input: SimulationInput,
 ): Promise<string> {
-	const prompt = `Based on the following company information and market challenge, generate 10 high-impact solutions for market entry. Each solution should represent a distinct approach to entering the market.
+	const prompt = `Based on the following company information and market challenge, generate 5 high-impact solutions for market entry. Each solution should represent a distinct approach to entering the market.
 
 Company Information:
 ${input.companyInfo}
@@ -16,7 +16,7 @@ ${input.companyInfo}
 Market Challenge:
 ${input.marketChallenge}
 
-Generate 10 different solutions that include:
+Generate 5 different solutions that include:
 1. A unique title and description
 2. Key advantages of this approach
 3. Potential challenges or risks
@@ -107,6 +107,92 @@ IMPORTANT: Focus on providing clear, detailed personas without any JSON formatti
 }
 
 /**
+ * Generates feedback and risk analysis from personas for each solution
+ */
+async function generatePersonaFeedback(
+	client: OpenAI,
+	solutions: string,
+	personas: string,
+	input: SimulationInput,
+): Promise<string> {
+	const prompt = `Based on the following solutions and personas, generate detailed feedback and risk analysis for each solution. You MUST analyze ALL solutions completely.
+
+SOLUTIONS:
+${solutions}
+
+PERSONAS:
+${personas}
+
+For EACH of the 5 solutions, provide a complete analysis following this structure:
+
+1. Solution Analysis Header:
+   "Analysis for Solution [N]: [Title]"
+
+2. Risk Score (0-100%) with breakdown:
+   - Market readiness
+   - Resource requirements
+   - Competitive landscape
+   - Technical complexity
+   - Regulatory considerations
+
+3. Persona Feedback for ALL 6 personas:
+   For each persona (both current and new):
+   - Initial reaction and sentiment
+   - Key concerns or reservations
+   - Potential benefits they see
+   - Likelihood of adoption (0-1)
+   - Suggested improvements from their perspective
+
+4. Overall Analysis:
+   - Primary risks and mitigation strategies
+   - Key success factors
+   - Recommended implementation approach
+   - Timeline considerations
+   - Resource requirements
+
+5. Solution Comparison:
+   After analyzing all 5 solutions, provide:
+   - Ranking of solutions by risk score (lowest to highest)
+   - Ranking of solutions by overall potential (highest to lowest)
+   - Key differentiators between solutions
+   - Recommendations for implementation priority
+
+Format Requirements:
+- Use clear headings and subheadings
+- Use bullet points for lists
+- Separate each solution's analysis with "---"
+- Include ALL 5 solutions in the analysis
+- End with a comprehensive comparison of all solutions
+
+IMPORTANT: 
+- You MUST analyze ALL 5 solutions completely
+- Do not skip any solutions
+- Provide the full analysis for each solution before moving to the next
+- Include the final comparison section after all individual analyses`;
+
+	try {
+		const response = await client.chat.completions.create({
+			model: "gpt-4",
+			messages: [
+				{
+					role: "system",
+					content:
+						"You are a market research expert analyzing solution viability and persona reactions. Provide detailed, realistic feedback and risk analysis for ALL solutions. Do not skip any solutions.",
+				},
+				{ role: "user", content: prompt },
+			],
+			temperature: 0.7,
+			max_tokens: 4000, // Increased token limit to ensure complete analysis
+		});
+
+		return response.choices[0].message.content || "No feedback generated";
+	} catch (error) {
+		console.error("Error generating persona feedback:", error);
+		throw new Error("Failed to generate persona feedback");
+	}
+}
+
+/**
  * Main simulation function that orchestrates the multi-step process
  */
 export async function runSimulation(
@@ -117,15 +203,19 @@ export async function runSimulation(
 	});
 
 	try {
-		// Step 1: Generate 10 high-impact solutions
+		// Step 1: Generate 5 high-impact solutions
 		const scenarios = await generateBusinessScenarios(client, input);
 
 		// Step 2: Generate 6 market personas (3 current + 3 new)
 		const personas = await generateMarketPersonas(client, input);
 
-		// For now, return a placeholder for feedback
-		const feedback =
-			"Feedback and analysis will be generated in the next phase.";
+		// Step 3: Generate feedback and risk analysis for each solution
+		const feedback = await generatePersonaFeedback(
+			client,
+			scenarios,
+			personas,
+			input,
+		);
 
 		return {
 			scenarios,
