@@ -12,13 +12,13 @@ interface SimulationFormProps {
 export function SimulationForm({ onSubmit }: SimulationFormProps) {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [rawResponse, setRawResponse] = useState<string | null>(null);
+	const [result, setResult] = useState<SimulationResult | null>(null);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		setLoading(true);
 		setError(null);
-		setRawResponse(null);
+		setResult(null);
 
 		const formData = new FormData(e.currentTarget);
 		const input: SimulationInput = {
@@ -37,11 +37,12 @@ export function SimulationForm({ onSubmit }: SimulationFormProps) {
 			});
 
 			if (!response.ok) {
-				throw new Error("Failed to run simulation");
+				const errorData = await response.json();
+				throw new Error(errorData.details || "Failed to run simulation");
 			}
 
 			const result: SimulationResult = await response.json();
-			setRawResponse(result.marketAnalysis);
+			setResult(result);
 			if (onSubmit) {
 				onSubmit(result);
 			}
@@ -52,17 +53,34 @@ export function SimulationForm({ onSubmit }: SimulationFormProps) {
 		}
 	};
 
-	if (rawResponse) {
+	if (result) {
 		return (
 			<Card className="bg-white p-6">
-				<h2 className="text-xl font-bold mb-4 text-primary">Raw LLM Response</h2>
-				<pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-sm border">
-					{rawResponse}
-				</pre>
+				<h2 className="text-xl font-bold mb-4 text-primary">Simulation Results</h2>
+				<div className="space-y-6">
+					<div>
+						<h3 className="text-lg font-semibold mb-2">Business Scenarios</h3>
+						<pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-sm border">
+							{result.scenarios}
+						</pre>
+					</div>
+					<div>
+						<h3 className="text-lg font-semibold mb-2">Market Personas</h3>
+						<pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-sm border">
+							{result.personas}
+						</pre>
+					</div>
+					<div>
+						<h3 className="text-lg font-semibold mb-2">Persona Feedback</h3>
+						<pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-sm border">
+							{result.feedback}
+						</pre>
+					</div>
+				</div>
 				<div className="mt-4 flex justify-end">
 					<Button
 						onClick={() => {
-							setRawResponse(null);
+							setResult(null);
 							if (onSubmit) {
 								onSubmit(null);
 							}
@@ -98,88 +116,67 @@ export function SimulationForm({ onSubmit }: SimulationFormProps) {
 						placeholder="Enter your OpenAI API key..."
 						required
 					/>
-					<p className="text-sm text-gray-500">
-						Your API key is only used for this simulation and is not stored.
-					</p>
 				</div>
 			</Card>
 
 			<Card className="bg-white p-6">
 				<div className="flex items-center gap-2 mb-4">
-					<div className="h-2 w-2 rounded-full bg-pink-500" />
-					<h2 className="text-xl font-bold text-pink-600">Challenge Statement</h2>
+					<div className="h-2 w-2 rounded-full bg-blue-500" />
+					<h2 className="text-xl font-bold text-blue-600">Company Information</h2>
 				</div>
 				<p className="text-gray-600 mb-4">
-					Describe your market entry challenge in detail to get AI-powered insights
+					Provide details about your company and current market position
 				</p>
-				<div className="space-y-4">
-					<div>
-						<label htmlFor="companyInfo" className="block font-medium text-gray-700">
-							Company Information
-						</label>
-						<textarea
-							id="companyInfo"
-							name="companyInfo"
-							className="w-full p-2 border-2 border-gray-200 rounded-lg h-32 focus:border-pink-500 focus:ring-pink-500"
-							placeholder="Describe your company's core business, size, and current market position..."
-							required
-						/>
-					</div>
-					<div>
-						<label htmlFor="marketChallenge" className="block font-medium text-gray-700">
-							Market Challenge
-						</label>
-						<textarea
-							id="marketChallenge"
-							name="marketChallenge"
-							className="w-full p-2 border-2 border-gray-200 rounded-lg h-32 focus:border-pink-500 focus:ring-pink-500"
-							placeholder="Describe the new market opportunity or challenge you're facing..."
-							required
-						/>
-					</div>
+				<div className="space-y-2">
+					<label htmlFor="companyInfo" className="block font-medium text-gray-700">
+						Company Information
+					</label>
+					<textarea
+						id="companyInfo"
+						name="companyInfo"
+						rows={4}
+						className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-blue-500"
+						placeholder="Describe your company's core business, size, and funding status..."
+						required
+					/>
+				</div>
+			</Card>
+
+			<Card className="bg-white p-6">
+				<div className="flex items-center gap-2 mb-4">
+					<div className="h-2 w-2 rounded-full bg-green-500" />
+					<h2 className="text-xl font-bold text-green-600">Market Challenge</h2>
+				</div>
+				<p className="text-gray-600 mb-4">
+					Describe the market entry opportunity or challenge you're facing
+				</p>
+				<div className="space-y-2">
+					<label htmlFor="marketChallenge" className="block font-medium text-gray-700">
+						Market Challenge
+					</label>
+					<textarea
+						id="marketChallenge"
+						name="marketChallenge"
+						rows={4}
+						className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-green-500"
+						placeholder="Describe the new market entry opportunity or challenge..."
+						required
+					/>
 				</div>
 			</Card>
 
 			{error && (
-				<div className="rounded-lg bg-red-50 p-4 text-red-600">
-					<p className="text-sm font-medium">Error: {error}</p>
+				<div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+					<p className="text-red-600">{error}</p>
 				</div>
 			)}
 
 			<Button
 				type="submit"
-				className="w-full bg-pink-600 hover:bg-pink-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+				className="w-full"
 				disabled={loading}
 			>
-				{loading ? (
-					<>
-						<svg
-							className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							aria-label="Loading indicator"
-						>
-							<title>Loading animation</title>
-							<circle
-								className="opacity-25"
-								cx="12"
-								cy="12"
-								r="10"
-								stroke="currentColor"
-								strokeWidth="4"
-							/>
-							<path
-								className="opacity-75"
-								fill="currentColor"
-								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-							/>
-						</svg>
-						Analyzing Challenge...
-					</>
-				) : (
-					"Analyze Challenge"
-				)}
+				{loading ? "Running Simulation..." : "Run Simulation"}
 			</Button>
 		</form>
 	);
