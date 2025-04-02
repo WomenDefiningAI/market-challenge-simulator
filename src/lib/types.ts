@@ -1,12 +1,19 @@
 export interface SimulationInput {
+	apiKey: string;
 	companyInfo: string;
 	marketChallenge: string;
 }
 
 export interface SimulationResult {
-	segments: ConsumerSegment[];
+	marketAnalysis: string;
+	personas: ConsumerSegment[];
+	feedback: Record<string, unknown>[];
 	recommendations: string[];
-	adoptionCurve: AdoptionCurveData[];
+	adoptionCurve: {
+		earlyAdopters: number;
+		mainstream: number;
+		lateAdopters: number;
+	};
 }
 
 export interface ConsumerSegment {
@@ -21,4 +28,26 @@ export interface AdoptionCurveData {
 	month: number;
 	adoptionRate: number;
 	segment: string;
+}
+
+export interface MarketPersona {
+	name: string;
+	age: string;
+	occupation: string;
+	background: string;
+	goals: string[];
+	painPoints: string[];
+	buyingBehavior: string;
+	techSavviness: string;
+	segment: string;
+}
+
+export interface PersonaFeedback {
+	persona: MarketPersona;
+	initialReaction: string;
+	concerns: string[];
+	likelyUseCases: string[];
+	suggestedImprovements: string[];
+	adoptionTimeframe: string;
+	priceExpectation: string;
 }

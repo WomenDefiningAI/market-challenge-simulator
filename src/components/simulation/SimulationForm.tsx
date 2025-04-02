@@ -1,31 +1,28 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import type { SimulationInput } from "@/lib/types";
-import { useRouter } from "next/navigation";
+import type { SimulationInput, SimulationResult } from "@/lib/types";
 import { useState } from "react";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
 
-export default function SimulationForm() {
-	const router = useRouter();
+interface SimulationFormProps {
+	onSubmit?: (result: SimulationResult | null) => void;
+}
+
+export function SimulationForm({ onSubmit }: SimulationFormProps) {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [rawResponse, setRawResponse] = useState<string | null>(null);
 
-	async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-		event.preventDefault();
+	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+		e.preventDefault();
 		setLoading(true);
 		setError(null);
+		setRawResponse(null);
 
-		const formData = new FormData(event.currentTarget);
+		const formData = new FormData(e.currentTarget);
 		const input: SimulationInput = {
+			apiKey: formData.get("apiKey") as string,
 			companyInfo: formData.get("companyInfo") as string,
 			marketChallenge: formData.get("marketChallenge") as string,
 		};
@@ -43,103 +40,147 @@ export default function SimulationForm() {
 				throw new Error("Failed to run simulation");
 			}
 
-			router.push("/simulation");
+			const result: SimulationResult = await response.json();
+			setRawResponse(result.marketAnalysis);
+			if (onSubmit) {
+				onSubmit(result);
+			}
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "An error occurred");
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	if (rawResponse) {
+		return (
+			<Card className="bg-white p-6">
+				<h2 className="text-xl font-bold mb-4 text-primary">Raw LLM Response</h2>
+				<pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-sm border">
+					{rawResponse}
+				</pre>
+				<div className="mt-4 flex justify-end">
+					<Button
+						onClick={() => {
+							setRawResponse(null);
+							if (onSubmit) {
+								onSubmit(null);
+							}
+						}}
+						variant="outline"
+					>
+						Back to Form
+					</Button>
+				</div>
+			</Card>
+		);
 	}
 
 	return (
-		<div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8">
-			<div className="max-w-2xl mx-auto">
-				<div className="text-center mb-8">
-					<h1 className="text-4xl font-bold text-foreground mb-2">Market Entry Simulator</h1>
-					<p className="text-muted-foreground">Analyze your market opportunities with AI-powered insights</p>
+		<form onSubmit={handleSubmit} className="space-y-6">
+			<Card className="bg-white p-6">
+				<div className="flex items-center gap-2 mb-4">
+					<div className="h-2 w-2 rounded-full bg-pink-500" />
+					<h2 className="text-xl font-bold text-pink-600">API Configuration</h2>
 				</div>
+				<p className="text-gray-600 mb-4">
+					Enter your OpenAI API key to enable AI-powered analysis
+				</p>
+				<div className="space-y-2">
+					<label htmlFor="apiKey" className="block font-medium text-gray-700">
+						OpenAI API Key
+					</label>
+					<input
+						type="password"
+						id="apiKey"
+						name="apiKey"
+						className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-pink-500 focus:ring-pink-500"
+						placeholder="Enter your OpenAI API key..."
+						required
+					/>
+					<p className="text-sm text-gray-500">
+						Your API key is only used for this simulation and is not stored.
+					</p>
+				</div>
+			</Card>
 
-				<form onSubmit={handleSubmit} className="space-y-6">
-					{error && (
-						<div className="rounded-lg bg-destructive/15 p-4 text-destructive">
-							<p className="text-sm font-medium">{error}</p>
-						</div>
-					)}
+			<Card className="bg-white p-6">
+				<div className="flex items-center gap-2 mb-4">
+					<div className="h-2 w-2 rounded-full bg-pink-500" />
+					<h2 className="text-xl font-bold text-pink-600">Challenge Statement</h2>
+				</div>
+				<p className="text-gray-600 mb-4">
+					Describe your market entry challenge in detail to get AI-powered insights
+				</p>
+				<div className="space-y-4">
+					<div>
+						<label htmlFor="companyInfo" className="block font-medium text-gray-700">
+							Company Information
+						</label>
+						<textarea
+							id="companyInfo"
+							name="companyInfo"
+							className="w-full p-2 border-2 border-gray-200 rounded-lg h-32 focus:border-pink-500 focus:ring-pink-500"
+							placeholder="Describe your company's core business, size, and current market position..."
+							required
+						/>
+					</div>
+					<div>
+						<label htmlFor="marketChallenge" className="block font-medium text-gray-700">
+							Market Challenge
+						</label>
+						<textarea
+							id="marketChallenge"
+							name="marketChallenge"
+							className="w-full p-2 border-2 border-gray-200 rounded-lg h-32 focus:border-pink-500 focus:ring-pink-500"
+							placeholder="Describe the new market opportunity or challenge you're facing..."
+							required
+						/>
+					</div>
+				</div>
+			</Card>
 
-					<Card className="bg-card border-border/50">
-						<CardHeader>
-							<div className="flex items-center gap-2">
-								<div className="h-2 w-2 rounded-full bg-primary" />
-								<CardTitle className="text-lg font-medium text-card-foreground">
-									Challenge Statement
-								</CardTitle>
-							</div>
-							<CardDescription className="text-muted-foreground">
-								Describe your market entry challenge in detail to get AI-powered insights
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<div className="space-y-2">
-								<Label htmlFor="company-info" className="text-foreground">Company Information</Label>
-								<Textarea
-									id="company-info"
-									name="companyInfo"
-									placeholder="Describe your company's core business, size, and current market position..."
-									className="min-h-[120px] resize-none bg-background/50 border-border/50 focus:border-primary"
-									required
-								/>
-							</div>
+			{error && (
+				<div className="rounded-lg bg-red-50 p-4 text-red-600">
+					<p className="text-sm font-medium">Error: {error}</p>
+				</div>
+			)}
 
-							<div className="space-y-2">
-								<Label htmlFor="market-challenge" className="text-foreground">Market Challenge</Label>
-								<Textarea
-									id="market-challenge"
-									name="marketChallenge"
-									placeholder="Describe the new market opportunity or challenge you're facing..."
-									className="min-h-[120px] resize-none bg-background/50 border-border/50 focus:border-primary"
-									required
-								/>
-							</div>
-						</CardContent>
-					</Card>
-
-					<Button 
-						type="submit" 
-						className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-						disabled={loading}
-					>
-						{loading ? (
-							<>
-								<svg
-									className="mr-2 h-4 w-4 animate-spin"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-									aria-label="Loading"
-								>
-									<title>Loading</title>
-									<circle
-										className="opacity-25"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										strokeWidth="4"
-									/>
-									<path
-										className="opacity-75"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-									/>
-								</svg>
-								Analyzing Challenge...
-							</>
-						) : (
-							'Analyze Challenge'
-						)}
-					</Button>
-				</form>
-			</div>
-		</div>
+			<Button
+				type="submit"
+				className="w-full bg-pink-600 hover:bg-pink-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+				disabled={loading}
+			>
+				{loading ? (
+					<>
+						<svg
+							className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							aria-label="Loading indicator"
+						>
+							<title>Loading animation</title>
+							<circle
+								className="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								strokeWidth="4"
+							/>
+							<path
+								className="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							/>
+						</svg>
+						Analyzing Challenge...
+					</>
+				) : (
+					"Analyze Challenge"
+				)}
+			</Button>
+		</form>
 	);
 }
