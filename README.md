@@ -4,18 +4,18 @@ A Next.js application that enables business strategists to evaluate new market o
 
 ## Features
 
-- Multi-step market entry simulation
-- Consumer segmentation analysis
-- Adoption trend predictions
-- Strategic recommendations
+- AI-powered market analysis using GPT-4
+- Detailed persona generation and feedback
+- Strategic recommendations based on market segments
+- Adoption timeline predictions
 - Interactive results dashboard
 
 ## Tech Stack
 
-- Next.js 14
+- Next.js 14 (App Router)
 - TypeScript
 - Tailwind CSS
-- DaisyUI
+- shadcn/ui components
 - OpenAI API
 
 ## Getting Started
@@ -31,11 +31,8 @@ cd market-entry-simulator
 npm install
 ```
 
-3. Create a `.env` file:
-```bash
-cp .env.example .env
-```
-Then add your OpenAI API key to the `.env` file.
+3. Set up your OpenAI API key:
+The application uses a client-side approach where users provide their own API keys. No environment variables are required for the OpenAI integration.
 
 4. Run the development server:
 ```bash
