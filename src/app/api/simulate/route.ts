@@ -1,8 +1,10 @@
 import { runSimulation } from "@/lib/simulation";
+import type { SimulationInput, SimulationResult } from "@/lib/types";
 import { NextResponse } from "next/server";
 
-interface SimulationError extends Error {
-	code?: string;
+interface ErrorWithCode {
+	message?: string;
+	code: string;
 	details?: string;
 }
 
@@ -11,59 +13,55 @@ interface SimulationError extends Error {
  */
 export async function POST(request: Request) {
 	try {
+		// Parse the request body
 		const body = await request.json();
-		const { companyInfo, marketChallenge, apiKey } = body;
 
-		// Basic validation for required fields
-		if (!companyInfo || !marketChallenge || !apiKey) {
+		// Validate required fields
+		if (!body.companyInfo || !body.marketChallenge || !body.apiKey) {
 			return NextResponse.json(
 				{
 					error: "Missing required fields",
-					code: "VALIDATION_ERROR",
 					details:
-						"Please provide company information, market challenge, and API key",
+						"companyInfo, marketChallenge, and apiKey are required fields",
 				},
 				{ status: 400 },
 			);
 		}
 
-		const result = await runSimulation({
-			companyInfo,
-			marketChallenge,
-			apiKey,
-		});
+		// Create simulation input from request body
+		const input: SimulationInput = {
+			companyInfo: body.companyInfo,
+			marketChallenge: body.marketChallenge,
+			apiKey: body.apiKey,
+		};
 
+		// Run the simulation
+		const result: SimulationResult = await runSimulation(input);
+
+		// Return the simulation result
 		return NextResponse.json(result);
 	} catch (error: unknown) {
-		console.error("API Error:", error);
+		console.error("Simulation API error:", error);
 
-		// Handle SimulationError with specific error codes
-		if (
-			error &&
-			typeof error === "object" &&
-			"name" in error &&
-			error.name === "SimulationError"
-		) {
-			const simError = error as SimulationError;
+		// Handle specific error types with code property
+		if (typeof error === "object" && error !== null && "code" in error) {
+			const typedError = error as ErrorWithCode;
+
 			return NextResponse.json(
 				{
-					error: simError.message,
-					code: simError.code,
-					details: simError.details,
+					error: typedError.message || "Simulation failed",
+					code: typedError.code,
+					details: typedError.details,
 				},
-				{ status: simError.code === "INVALID_API_KEY" ? 401 : 500 },
+				{ status: 400 },
 			);
 		}
 
-		// Handle other errors
+		// Generic error handling
 		return NextResponse.json(
 			{
-				error: "Internal server error",
-				code: "UNKNOWN_ERROR",
-				details:
-					error instanceof Error
-						? error.message
-						: "An unexpected error occurred",
+				error: "Simulation failed",
+				details: error instanceof Error ? error.message : "Unknown error",
 			},
 			{ status: 500 },
 		);

@@ -1,25 +1,14 @@
 import type { SimulationInput, SimulationResult } from "@/lib/types";
-import OpenAI from "openai";
-
-class SimulationError extends Error {
-	constructor(
-		message: string,
-		public readonly code?: string,
-		public readonly details?: string,
-	) {
-		super(message);
-		this.name = "SimulationError";
-	}
-}
+import { OpenAI } from "openai";
 
 /**
- * Generates 5 high-impact solutions based on company info and market challenge
+ * Generates business scenarios based on company info and market challenge
  */
 async function generateBusinessScenarios(
 	client: OpenAI,
 	input: SimulationInput,
 ): Promise<string> {
-	const prompt = `Based on the following company information and market challenge, generate 5 high-impact solutions for market entry. Each solution should represent a distinct approach to entering the market.
+	const prompt = `Based on the following company information and market challenge, generate 5 high-impact solutions.
 
 Company Information:
 ${input.companyInfo}
@@ -27,19 +16,18 @@ ${input.companyInfo}
 Market Challenge:
 ${input.marketChallenge}
 
-Generate 5 different solutions that include:
-1. A unique title and description
-2. Key advantages of this approach
-3. Potential challenges or risks
-4. Estimated timeline for implementation
-5. Required resources or investments
+Generate 5 different solutions with varying approaches, risk levels, and perspectives. Format each solution as follows:
 
-Format each solution clearly with:
-- A numbered heading (e.g., "Solution 1: [Title]")
-- Clear sections for description, advantages, challenges, timeline, and resources
-- Bullet points for lists
+Solution 1: [Title]
+- Description: [One paragraph summary]
+- Advantages: [List major benefits]
+- Challenges: [List potential obstacles]
+- Target market: [Primary audience]
+- Innovation level: [Incremental/Moderate/Disruptive]
 
-IMPORTANT: Focus on providing clear, detailed solutions without any JSON formatting.`;
+Continue for Solution 2, 3, 4, and 5.
+
+Ensure the solutions vary in risk profile, market approach, and innovation level.`;
 
 	try {
 		const response = await client.chat.completions.create({
@@ -48,33 +36,17 @@ IMPORTANT: Focus on providing clear, detailed solutions without any JSON formatt
 				{
 					role: "system",
 					content:
-						"You are a strategic business consultant specializing in market entry strategies. Provide detailed, practical solutions that consider both opportunities and risks.",
+						"You are a strategic business consultant generating creative but practical solutions for market challenges.",
 				},
 				{ role: "user", content: prompt },
 			],
 			temperature: 0.7,
 		});
 
-		return response.choices[0].message.content || "No solutions generated";
-	} catch (error: any) {
+		return response.choices[0].message.content || "No scenarios generated";
+	} catch (error: unknown) {
 		console.error("Error generating business scenarios:", error);
-
-		// Handle OpenAI API specific errors
-		if (error?.error?.type === "invalid_request_error") {
-			if (error.code === "invalid_api_key") {
-				throw new SimulationError(
-					"Invalid API Key",
-					"INVALID_API_KEY",
-					"Please check your OpenAI API key and try again.",
-				);
-			}
-		}
-
-		throw new SimulationError(
-			"Failed to generate business scenarios",
-			"GENERATION_ERROR",
-			error?.message || "An unexpected error occurred",
-		);
+		throw new Error("Failed to generate business scenarios");
 	}
 }
 
@@ -131,7 +103,7 @@ IMPORTANT:
 		});
 
 		return response.choices[0].message.content || "No personas generated";
-	} catch (error) {
+	} catch (error: unknown) {
 		console.error("Error generating market personas:", error);
 		throw new Error("Failed to generate market personas");
 	}
@@ -233,23 +205,24 @@ IMPORTANT REQUIREMENTS:
 }
 
 /**
- * Main simulation function that orchestrates the multi-step process
+ * Main function to run the simulation process
  */
 export async function runSimulation(
 	input: SimulationInput,
 ): Promise<SimulationResult> {
-	const client = new OpenAI({
-		apiKey: input.apiKey,
-	});
-
 	try {
-		// Step 1: Generate 5 high-impact solutions
+		// Create OpenAI client with the provided API key
+		const client = new OpenAI({
+			apiKey: input.apiKey,
+		});
+
+		// Generate business scenarios
 		const scenarios = await generateBusinessScenarios(client, input);
 
-		// Step 2: Generate 6 market personas (3 current + 3 new)
+		// Generate market personas
 		const personas = await generateMarketPersonas(client, input);
 
-		// Step 3: Generate feedback and risk analysis for each solution
+		// Generate persona feedback for the scenarios
 		const feedback = await generatePersonaFeedback(
 			client,
 			scenarios,
@@ -262,17 +235,8 @@ export async function runSimulation(
 			personas,
 			feedback,
 		};
-	} catch (error) {
-		console.error("Simulation error:", error);
-
-		if (error instanceof SimulationError) {
-			throw error; // Preserve the error details
-		}
-
-		throw new SimulationError(
-			"Failed to run simulation",
-			"UNKNOWN_ERROR",
-			error instanceof Error ? error.message : "An unexpected error occurred",
-		);
+	} catch (error: unknown) {
+		console.error("Error running simulation:", error);
+		throw error;
 	}
 }
