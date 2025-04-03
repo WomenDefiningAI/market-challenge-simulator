@@ -5,9 +5,18 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { ParsedSimulationResult } from "@/lib/types";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import type {
+	CompletionEvent,
+	ErrorEvent,
+	FeedbackScoresEvent,
+	ParsedSimulationResult,
+	PersonaSummaryEvent,
+	ScenarioTitlesEvent,
+	SimulationStreamEvent,
+	StageUpdateEvent
+} from "@/lib/types";
+import { Activity, CheckCircle2, Eye, EyeOff, ListChecks, Loader2, Users } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { SimulationReport } from "./SimulationReport";
 import { SimulatorHeader } from "./SimulatorHeader";
 
@@ -31,29 +40,27 @@ export function SimulationForm() {
 	const [apiKey, setApiKey] = useState("");
 	const [showApiKey, setShowApiKey] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
-	const [currentStage, setCurrentStage] = useState(0);
+	const [currentStageId, setCurrentStageId] = useState<string | null>(null);
 	const [error, setError] = useState<ErrorDisplay | null>(null);
 	const [result, setResult] = useState<ParsedSimulationResult | null>(null);
 	const [showReport, setShowReport] = useState(false);
 
-	// Progress through simulation stages
+	const [interimTitles, setInterimTitles] = useState<string[]>([]);
+	const [interimPersonas, setInterimPersonas] = useState<Array<{ name: string; description: string; age?: string; role?: string }>>([]);
+	const [interimScores, setInterimScores] = useState<Array<{ title: string; feasibility: number; return: number }>>([]);
+	const [currentStageMessage, setCurrentStageMessage] = useState<string>("");
+
+	const eventSourceRef = useRef<EventSource | null>(null);
+
 	useEffect(() => {
-		if (!isLoading) {
-			setCurrentStage(0);
-			return;
-		}
-
-		const interval = setInterval(() => {
-			setCurrentStage((stage) => {
-				if (stage >= SIMULATION_STAGES.length - 1) {
-					return stage;
-				}
-				return stage + 1;
-			});
-		}, 3000);
-
-		return () => clearInterval(interval);
-	}, [isLoading]);
+		return () => {
+			if (eventSourceRef.current) {
+				eventSourceRef.current.close();
+				eventSourceRef.current = null;
+				console.log("EventSource closed on unmount/cleanup");
+			}
+		};
+	}, []);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -61,49 +68,141 @@ export function SimulationForm() {
 		setError(null);
 		setResult(null);
 		setShowReport(false);
+		setInterimTitles([]);
+		setInterimPersonas([]);
+		setInterimScores([]);
+		setCurrentStageId(null);
+		setCurrentStageMessage("Initiating simulation...");
+
+		if (eventSourceRef.current) {
+			eventSourceRef.current.close();
+			eventSourceRef.current = null;
+		}
 
 		try {
-			const response = await fetch("/api/simulate", {
+			fetch("/api/simulate/stream", {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					companyInfo,
-					marketChallenge,
-					apiKey,
-				}),
-			});
-
-			const data: ParsedSimulationResult | { error: string; code?: string; details?: string } = await response.json();
-
-			if (!response.ok) {
-				if ('error' in data && typeof data.error === 'string') {
-					throw {
-						message: data.error,
-						code: 'code' in data ? String(data.code) : undefined,
-						details: 'details' in data ? String(data.details) : undefined,
-					};
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ companyInfo, marketChallenge, apiKey }),
+			})
+			.then(response => {
+				if (!response.ok) {
+					return response.json().then(errData => {
+						throw {
+							message: errData.error || `HTTP error! status: ${response.status}`,
+							code: errData.code,
+							details: errData.details
+						};
+					});
 				}
-				throw { message: "Simulation failed with an unexpected response format." };
-			}
+				if (!response.body) {
+					throw { message: "Response body is null" };
+				}
 
-			if ('solutions' in data) {
-				setResult(data);
-				setShowReport(true);
-			} else {
-				throw { message: "Received unexpected simulation result format from server." };
-			}
+				const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+				let buffer = "";
 
-		} catch (err: unknown) {
-			const error = err as { message?: string; code?: string; details?: string };
-			setError({
-				message: error.message || "An error occurred",
-				code: error.code,
-				details: error.details,
+				function processStream() {
+					reader.read().then(({ done, value }) => {
+						if (done) {
+							console.log("Stream finished.");
+							if (isLoading) {
+								setError({ message: "Simulation stream ended unexpectedly." });
+								setIsLoading(false);
+							}
+							return;
+						}
+
+						buffer += value;
+						const parts = buffer.split("\n\n");
+						
+						for (let i = 0; i < parts.length - 1; i++) {
+							const message = parts[i];
+							if (message.startsWith("event: message\n") && message.includes("\ndata: ")) {
+								const dataLine = message.split("\ndata: ")[1];
+								if (dataLine) {
+									try {
+										const jsonData = JSON.parse(dataLine);
+										const event = jsonData as SimulationStreamEvent;
+
+										console.log("Received SSE:", event.type, event);
+
+										// Update state based on event type
+										switch (event.type) {
+											case "scenario_generation":
+												setCurrentStageId(event.type);
+												if ('message' in event) setCurrentStageMessage(event.message);
+												if ('data' in event) setInterimTitles(event.data.titles);
+												break;
+											case "persona_generation":
+												setCurrentStageId(event.type);
+												if ('message' in event) setCurrentStageMessage(event.message);
+												if ('data' in event) setInterimPersonas(event.data.personas);
+												break;
+											case "feedback_generation":
+												setCurrentStageId(event.type);
+												if ('message' in event) setCurrentStageMessage(event.message);
+												if ('data' in event) setInterimScores(event.data.scores);
+												break;
+											case "parsing":
+												setCurrentStageId(event.type);
+												if ('message' in event) setCurrentStageMessage(event.message);
+												break;
+											case "complete":
+												setCurrentStageId(event.type);
+												setCurrentStageMessage("Simulation Complete"); // Set final message
+												setResult((event as CompletionEvent).data);
+												setShowReport(true);
+												setIsLoading(false);
+												reader.cancel();
+												break;
+											case "error":
+												setCurrentStageId(event.type);
+												setError((event as ErrorEvent).error);
+												setIsLoading(false);
+												reader.cancel();
+												break;
+										}
+									} catch (parseError) {
+										console.error("Failed to parse SSE data:", dataLine, parseError);
+									}
+								}
+							}
+						}
+						// Keep the last partial message
+						buffer = parts[parts.length - 1];
+
+						// Continue reading
+						processStream();
+						
+					}).catch(streamError => {
+						console.error("Stream reading error:", streamError);
+						setError({ message: "Error reading simulation stream." });
+						setIsLoading(false);
+					});
+				}
+
+				processStream();
+
+			})
+			.catch(err => {
+				console.error("Simulation fetch/setup error:", err);
+				const error = err as { message?: string; code?: string; details?: string };
+				setError({
+					message: error.message || "Failed to start simulation",
+					code: error.code,
+					details: error.details,
+				});
+				setIsLoading(false);
 			});
-		} finally {
+
+		} catch (err) {
+			console.error("Failed to initiate simulation stream connection:", err);
+			setError({
+				message: "Failed to connect to simulation service.",
+			});
 			setIsLoading(false);
+			return;
 		}
 	};
 
@@ -180,11 +279,11 @@ export function SimulationForm() {
 							<div className="col-span-2 mt-4">
 								<Button
 									type="submit"
-									className="w-full py-6 text-lg bg-indigo-600 hover:bg-indigo-700 text-white"
+									className="w-full py-6 text-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-70 disabled:cursor-not-allowed"
 									disabled={isLoading || !companyInfo || !marketChallenge || !apiKey}
 								>
 									{isLoading ? (
-										<span className="flex items-center gap-2">
+										<span className="flex items-center justify-center gap-2">
 											<Loader2 className="animate-spin" size={24} />
 											Running Simulation...
 										</span>
@@ -195,31 +294,38 @@ export function SimulationForm() {
 
 								{isLoading && (
 									<div className="mt-6 space-y-4">
-										{SIMULATION_STAGES.map((stage, idx) => (
-											<div
-												key={stage}
-												className={`flex items-center gap-3 transition-opacity duration-500 ${
-													idx <= currentStage ? "opacity-100" : "opacity-40"
-												}`}
-											>
-												<div className={`w-4 h-4 rounded-full ${
-													idx < currentStage
-														? "bg-pink-500"
-														: idx === currentStage
-														? "bg-indigo-500 animate-pulse"
-														: "bg-gray-200"
-												}`} />
-												<span className={`text-sm ${
-													idx < currentStage
-														? "text-pink-700"
-														: idx === currentStage
-														? "text-indigo-700"
-														: "text-gray-500"
-												}`}>
-													{stage}
-												</span>
-											</div>
-										))}
+										{SIMULATION_STAGES.filter(s => s !== "Compiling final analysis and recommendations...").map((stage, idx) => {
+											const isActive = currentStageId === stage;
+											const isDone = 
+												SIMULATION_STAGES.findIndex(s => s === currentStageId) > idx || 
+												currentStageId === 'complete';
+											
+											return (
+												<div key={stage} className="transition-opacity duration-500 space-y-2">
+													<div className={`flex items-center gap-3 ${!isActive && !isDone ? 'opacity-40' : 'opacity-100'}`}>
+														<div className={`w-4 h-4 rounded-full flex-shrink-0 ${isDone ? "bg-pink-500" : isActive ? "bg-indigo-500 animate-pulse" : "bg-gray-200"}`} />
+														<span className={`text-sm ${isDone ? "text-pink-700" : isActive ? "text-indigo-700 font-medium" : "text-gray-500"}`}>
+															{isActive ? currentStageMessage : stage}
+														</span>
+													</div>
+													<div className="pl-7 text-xs text-gray-600">
+														{stage === 'Generating potential market entry strategies...' && interimTitles.length > 0 && (
+															<ul>{interimTitles.map(t => <li key={t}>- {t}</li>)}</ul>
+														)}
+														{stage === 'Creating market personas and stakeholders...' && interimPersonas.length > 0 && (
+															<ul className="space-y-1">
+																{interimPersonas.map(p => <li key={p.name}>- **{p.name}**: {p.description.substring(0, 70)}...</li>)}
+															</ul>
+														)}
+														{stage === 'Simulating market reactions and feedback...' && interimScores.length > 0 && (
+															<ul className="space-y-1">
+																{interimScores.map(s => <li key={s.title}>- **{s.title}**: Feasibility {s.feasibility}%, Return {s.return}%</li>)}
+															</ul>
+														)}
+													</div>
+												</div>
+											);
+										})}
 									</div>
 								)}
 							</div>
