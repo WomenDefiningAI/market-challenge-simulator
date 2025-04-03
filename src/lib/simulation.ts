@@ -118,7 +118,7 @@ async function generatePersonaFeedback(
 	personas: string,
 	input: SimulationInput,
 ): Promise<string> {
-	const prompt = `Based on the following solutions and personas, generate detailed feedback and risk analysis for each solution. You MUST analyze ALL solutions completely.
+	const prompt = `Based on the following solutions and personas, generate detailed feedback and confidence analysis for each solution. You MUST analyze ALL solutions completely.
 
 SOLUTIONS:
 ${solutions}
@@ -131,10 +131,12 @@ For EACH of the 5 solutions, provide a complete analysis following this EXACT fo
 [SOLUTION_ANALYSIS_START]
 Analysis for Solution [N]: [Title]
 
-Risk Score: [0-100]%
+Confidence Scores:
+- Feasibility Score: [0-100]% ([brief explanation of feasibility])
+- Return Score: [0-100]% ([brief explanation of potential return])
 - Market readiness: [0-100]% ([brief explanation])
 - Resource requirements: [0-100]% ([brief explanation])
-- Competitive landscape: [0-100]% ([brief explanation])
+- Competitive advantage: [0-100]% ([brief explanation])
 - Technical complexity: [0-100]% ([brief explanation])
 - Regulatory considerations: [0-100]% ([brief explanation])
 
@@ -152,7 +154,8 @@ Risk Score: [0-100]%
 Repeat the [PERSONA_FEEDBACK_START]...[PERSONA_FEEDBACK_END] section for EACH persona.
 
 Overall Analysis:
-- Primary risks: [list key risks]
+- Primary strengths: [list key strengths]
+- Primary challenges: [list key challenges]
 - Mitigation strategies: [list strategies]
 - Key success factors: [list factors]
 - Recommended implementation approach: [approach]
@@ -166,8 +169,8 @@ After analyzing all solutions, provide:
 
 [COMPARISON_START]
 Solution Comparison:
-- Ranking of solutions by risk score (lowest to highest): [ordered list]
-- Ranking of solutions by overall potential (highest to lowest): [ordered list]
+- Ranking of solutions by feasibility (highest to lowest): [ordered list]
+- Ranking of solutions by return potential (highest to lowest): [ordered list]
 - Key differentiators between solutions: [list differences]
 - Recommendations for implementation priority: [ordered list]
 [COMPARISON_END]
@@ -175,12 +178,14 @@ Solution Comparison:
 IMPORTANT REQUIREMENTS: 
 1. You MUST analyze ALL solutions completely
 2. Format EXACTLY as shown with the delimiter tags
-3. EVERY persona MUST have a direct first-person quote that sounds authentic
-4. Quotes should be specific to the solution and the persona's background
-5. Use REALISTIC first-person language for quotes, not analytical summaries
-6. Include the persona's NAME, AGE, and ROLE in the analysis
-7. Make the quotes varied and diverse - some positive, some with concerns
-8. Do NOT use generic quotes - be specific to solution features and persona needs`;
+3. The Feasibility Score should reflect how feasible/practical the solution is to implement (higher is better)
+4. The Return Score should reflect the potential return on investment (higher is better)
+5. EVERY persona MUST have a direct first-person quote that sounds authentic
+6. Quotes should be specific to the solution and the persona's background
+7. Use REALISTIC first-person language for quotes, not analytical summaries
+8. Include the persona's NAME, AGE, and ROLE in the analysis
+9. Make the quotes varied and diverse - some positive, some with concerns
+10. Do NOT use generic quotes - be specific to solution features and persona needs`;
 
 	try {
 		const response = await client.chat.completions.create({

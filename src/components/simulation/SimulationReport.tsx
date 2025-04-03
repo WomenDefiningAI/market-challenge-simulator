@@ -482,74 +482,115 @@ function extractSolutions(
 
 			const title = titleMatch[1].trim();
 
-			// Extract risk scores
+			// Try to extract direct confidence scores first (new format)
+			const feasibilityScoreMatch = block.match(/Feasibility Score:\s*(\d+)%/);
+			const returnScoreMatch = block.match(/Return Score:\s*(\d+)%/);
+			
+			// Fallback to risk score and market readiness (old format)
 			const riskMatch = block.match(/Risk Score:\s*(\d+)%/);
 			const marketReadinessMatch = block.match(/Market readiness:\s*(\d+)%/);
 			const resourceRequirementsMatch = block.match(
 				/Resource requirements:\s*(\d+)%/,
 			);
 
-			// Calculate feasibility (invert risk score) and return
+			// Initialize with default values
 			let feasibility = 75;
 			let returnScore = 65;
 
-			if (riskMatch?.[1]) {
+			// Try to use direct scores if available
+			if (feasibilityScoreMatch?.[1]) {
+				const directFeasibility = Number.parseInt(feasibilityScoreMatch[1]);
+				if (!Number.isNaN(directFeasibility)) {
+					feasibility = directFeasibility;
+				}
+			} else if (riskMatch?.[1]) {
+				// Fallback to inverted risk score
 				const riskScore = Number.parseInt(riskMatch[1]);
 				if (!Number.isNaN(riskScore)) {
 					feasibility = 100 - riskScore; // Invert risk score for feasibility
 				}
 			}
 
-			if (marketReadinessMatch?.[1]) {
-				const marketReadiness = Number.parseInt(marketReadinessMatch[1]);
-				if (!Number.isNaN(marketReadiness)) {
-					// Blend the market readiness with feasibility
-					feasibility = Math.round(feasibility * 0.6 + marketReadiness * 0.4);
+			// Try to use direct return score if available
+			if (returnScoreMatch?.[1]) {
+				const directReturn = Number.parseInt(returnScoreMatch[1]);
+				if (!Number.isNaN(directReturn)) {
+					returnScore = directReturn;
 				}
-			}
-
-			if (resourceRequirementsMatch?.[1]) {
-				const resourceRequirements = Number.parseInt(
-					resourceRequirementsMatch[1],
-				);
+			} else if (resourceRequirementsMatch?.[1]) {
+				// Fallback to inverted resource requirements
+				const resourceRequirements = Number.parseInt(resourceRequirementsMatch[1]);
 				if (!Number.isNaN(resourceRequirements)) {
-					// Use inverted resource requirements
 					returnScore = Math.round(100 - resourceRequirements);
 				}
 			}
 
-			// Find description in the scenarios
+			// Blend market readiness into feasibility if it's available and direct score not provided
+			if (!feasibilityScoreMatch?.[1] && marketReadinessMatch?.[1]) {
+				const marketReadiness = Number.parseInt(marketReadinessMatch[1]);
+				if (!Number.isNaN(marketReadiness)) {
+					feasibility = Math.round(feasibility * 0.6 + marketReadiness * 0.4);
+				}
+			}
+
+			// Find description in the scenarios - improved pattern matching
 			let description = "No description available";
-			const scenarioMatch = scenarios.match(
+			
+			// Try to find by exact title match
+			const exactScenarioMatch = scenarios.match(
 				new RegExp(
 					`Solution \\d+:\\s*${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?- Description:\\s*([^\\n]+)`,
 					"i",
 				),
 			);
-			if (scenarioMatch?.[1]) {
-				description = scenarioMatch[1].trim();
+
+			if (exactScenarioMatch?.[1]) {
+				description = exactScenarioMatch[1].trim();
+			} else {
+				// Try to find by approximate title match
+				const scenarioSections = scenarios.split(/(Solution \d+:|Strategy \d+:)/);
+				
+				for (let i = 1; i < scenarioSections.length; i += 2) {
+					if (i + 1 >= scenarioSections.length) break;
+					
+					const titleLine = scenarioSections[i].trim();
+					const contentSection = scenarioSections[i + 1].trim();
+					
+					// Check if this section contains a similar title
+					const sectionTitleMatch = titleLine.match(/(Solution|Strategy) \d+:\s*(.*?)$/);
+					
+					if (sectionTitleMatch && 
+						(sectionTitleMatch[2].toLowerCase().includes(title.toLowerCase()) || 
+						 title.toLowerCase().includes(sectionTitleMatch[2].toLowerCase()))) {
+						
+						// Extract description
+						const descMatch = contentSection.match(
+							/- Description:\s*(.*?)(?=\n- [A-Z]|$)/s,
+						);
+						
+						if (descMatch?.[1]) {
+							description = descMatch[1].trim();
+							break;
+						}
+					}
+				}
 			}
 
-			// Get persona feedback
+			// Get persona feedback and combine into a single array
 			const { positiveQuotes, concernQuotes } = extractPersonaFeedback(
 				feedback,
 				title,
 				personaMap,
 			);
+			
+			// Combine all quotes for single-column display
+			const allQuotes = [...positiveQuotes, ...concernQuotes];
 
 			// Ensure we have at least some quotes
-			if (positiveQuotes.length === 0) {
-				positiveQuotes.push({
+			if (allQuotes.length === 0) {
+				allQuotes.push({
 					name: "Analysis",
-					quote: `"${title} offers significant market potential."`,
-					isPersona: false,
-				});
-			}
-
-			if (concernQuotes.length === 0) {
-				concernQuotes.push({
-					name: "Consideration",
-					quote: `"Implementation details need careful consideration."`,
+					quote: `"${title} offers significant market potential but requires careful implementation."`,
 					isPersona: false,
 				});
 			}
@@ -559,8 +600,8 @@ function extractSolutions(
 				description,
 				feasibility,
 				return: returnScore,
-				positiveQuotes,
-				concernQuotes,
+				positiveQuotes: allQuotes,
+				concernQuotes: [], // We'll not use this anymore
 			});
 		}
 	} else {
@@ -867,83 +908,47 @@ export function SimulationReport({
 								</div>
 
 								<h4 className="text-lg font-semibold mb-4 text-gray-900">
-									Analysis & Feedback
+									Persona Feedback
 								</h4>
-								<div className="grid grid-cols-2 gap-8">
-									<div>
-										<div className="flex items-center gap-2 text-gray-900 mb-4">
-											<Check size={20} className={solutionType.color} />
-											<h5 className="font-semibold">Positive Feedback</h5>
-										</div>
-										<div className="space-y-4">
-											{solution.positiveQuotes.map((item, i) => (
-												<div
-													key={`positive-${solution.title}-${i}`}
-													className={`p-4 rounded-lg ${solutionType.bgColor}`}
-												>
-													<p className={`italic ${solutionType.color}`}>
-														{item.quote}
-													</p>
-													<div className="flex items-center gap-2 mt-2 text-gray-700">
-														{item.isPersona ? (
-															<User size={14} className="text-indigo-500" />
-														) : (
-															<Check size={14} />
-														)}
-														<span className="text-sm font-medium">
-															{item.isPersona && item.fullPersonaDetails
-																? item.fullPersonaDetails
-																: item.isPersona
-																	? `${item.name}${item.age ? `, ${item.age}` : ""}${item.role ? `, ${item.role}` : ""}`
-																	: item.name}
-														</span>
-													</div>
-													{item.isPersona && item.description && (
-														<p className="text-xs text-gray-600 mt-1 ml-6">
-															{item.description}
-														</p>
+								<div className="space-y-4">
+									{solution.positiveQuotes.map((item, i) => {
+										// Determine if this is a concern or positive feedback
+										const isPositive = 
+											item.quote.toLowerCase().includes("like") || 
+											item.quote.toLowerCase().includes("great") || 
+											item.quote.toLowerCase().includes("benefit") || 
+											item.quote.toLowerCase().includes("hope") ||
+											item.quote.toLowerCase().includes("potential") ||
+											!item.quote.toLowerCase().includes("concerned") &&
+											!item.quote.toLowerCase().includes("worried") && 
+											!item.quote.toLowerCase().includes("risk") &&
+											!item.quote.toLowerCase().includes("problem");
+										
+										return (
+											<div
+												key={`feedback-${solution.title}-${i}`}
+												className={`p-4 rounded-lg ${isPositive ? solutionType.bgColor : 'bg-gray-50'}`}
+											>
+												<p className={`italic ${isPositive ? solutionType.color : 'text-gray-700'}`}>
+													{item.quote}
+												</p>
+												<div className="flex items-center gap-2 mt-2 text-gray-700">
+													{item.isPersona ? (
+														<User size={14} className="text-indigo-500" />
+													) : (
+														isPositive ? <Check size={14} /> : <MessageCircle size={14} />
 													)}
+													<span className="text-sm font-medium">
+														{item.isPersona && item.fullPersonaDetails
+															? item.fullPersonaDetails
+															: item.isPersona
+																? `${item.name}${item.age ? `, ${item.age}` : ""}${item.role ? `, ${item.role}` : ""}`
+																: item.name}
+													</span>
 												</div>
-											))}
-										</div>
-									</div>
-									<div>
-										<div className="flex items-center gap-2 text-gray-900 mb-4">
-											<MessageCircle size={20} className={solutionType.color} />
-											<h5 className="font-semibold">
-												Concerns & Considerations
-											</h5>
-										</div>
-										<div className="space-y-4">
-											{solution.concernQuotes.map((item, i) => (
-												<div
-													key={`concern-${solution.title}-${i}`}
-													className="bg-gray-50 p-4 rounded-lg"
-												>
-													<p className="text-gray-700 italic">{item.quote}</p>
-													<div className="flex items-center gap-2 mt-2 text-gray-700">
-														{item.isPersona ? (
-															<User size={14} className="text-indigo-500" />
-														) : (
-															<MessageCircle size={14} />
-														)}
-														<span className="text-sm font-medium">
-															{item.isPersona && item.fullPersonaDetails
-																? item.fullPersonaDetails
-																: item.isPersona
-																	? `${item.name}${item.age ? `, ${item.age}` : ""}${item.role ? `, ${item.role}` : ""}`
-																	: item.name}
-														</span>
-													</div>
-													{item.isPersona && item.description && (
-														<p className="text-xs text-gray-600 mt-1 ml-6">
-															{item.description}
-														</p>
-													)}
-												</div>
-											))}
-										</div>
-									</div>
+											</div>
+										)
+									})}
 								</div>
 							</div>
 						</Card>
