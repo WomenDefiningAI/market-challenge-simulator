@@ -7,7 +7,7 @@ import { Suspense } from "react";
 
 // Dynamically import the simulation form to avoid SSR issues with browser-only APIs
 const SimulationForm = dynamic(
-	() => import("@/components/simulation/SimulationForm"),
+	() => import("@/components/simulation/SimulationForm").then((mod) => mod.SimulationForm),
 	{ ssr: false },
 );
 
