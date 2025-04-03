@@ -1,31 +1,40 @@
 "use client";
 
-import type { SimulationInput, SimulationResult } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { Button } from "../ui/button";
-import { Card } from "../ui/card";
+import { SimulationReport } from "./SimulationReport";
 
-interface SimulationFormProps {
-	onSubmit?: (result: SimulationResult | null) => void;
+interface ErrorDisplay {
+	message: string;
+	details?: string;
+	code?: string;
 }
 
-export function SimulationForm({ onSubmit }: SimulationFormProps) {
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [result, setResult] = useState<SimulationResult | null>(null);
+export function SimulationForm() {
+	const [companyInfo, setCompanyInfo] = useState("");
+	const [marketChallenge, setMarketChallenge] = useState("");
+	const [apiKey, setApiKey] = useState("");
+	const [showApiKey, setShowApiKey] = useState(false);
+	const [isLoading, setIsLoading] = useState(false);
+	const [error, setError] = useState<ErrorDisplay | null>(null);
+	const [result, setResult] = useState<{
+		scenarios: string;
+		personas: string;
+		feedback: string;
+	} | null>(null);
+	const [showReport, setShowReport] = useState(false);
 
-	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		setLoading(true);
+		setIsLoading(true);
 		setError(null);
 		setResult(null);
-
-		const formData = new FormData(e.currentTarget);
-		const input: SimulationInput = {
-			apiKey: formData.get("apiKey") as string,
-			companyInfo: formData.get("companyInfo") as string,
-			marketChallenge: formData.get("marketChallenge") as string,
-		};
+		setShowReport(false);
 
 		try {
 			const response = await fetch("/api/simulate", {
@@ -33,133 +42,160 @@ export function SimulationForm({ onSubmit }: SimulationFormProps) {
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify(input),
+				body: JSON.stringify({
+					companyInfo,
+					marketChallenge,
+					apiKey,
+				}),
 			});
 
+			const data = await response.json();
+
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.details || "Failed to run simulation");
+				throw {
+					message: data.error || "Failed to run simulation",
+					code: data.code,
+					details: data.details,
+				};
 			}
 
-			const result: SimulationResult = await response.json();
-			setResult(result);
-			if (onSubmit) {
-				onSubmit(result);
-			}
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "An error occurred");
+			setResult(data);
+		} catch (err: any) {
+			setError({
+				message: err.message || "An error occurred",
+				code: err.code,
+				details: err.details,
+			});
 		} finally {
-			setLoading(false);
+			setIsLoading(false);
 		}
 	};
 
-	if (result) {
+	if (showReport && result) {
 		return (
-			<Card className="bg-white p-6">
-				<h2 className="text-xl font-bold mb-4 text-primary">Simulation Results</h2>
-				<div className="space-y-6">
-					<div>
-						<h3 className="text-lg font-semibold mb-2">Business Scenarios</h3>
-						<pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-sm border">
-							{result.scenarios}
-						</pre>
-					</div>
-					<div>
-						<h3 className="text-lg font-semibold mb-2">Market Personas</h3>
-						<pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-sm border">
-							{result.personas}
-						</pre>
-					</div>
-					<div>
-						<h3 className="text-lg font-semibold mb-2">Persona Feedback</h3>
-						<pre className="whitespace-pre-wrap bg-gray-50 p-4 rounded-lg text-sm border">
-							{result.feedback}
-						</pre>
-					</div>
-				</div>
-				<div className="mt-4 flex justify-end">
-					<Button
-						onClick={() => {
-							setResult(null);
-							if (onSubmit) {
-								onSubmit(null);
-							}
-						}}
-						variant="outline"
-					>
-						Back to Form
-					</Button>
-				</div>
-			</Card>
+			<SimulationReport
+				companyInfo={companyInfo}
+				marketChallenge={marketChallenge}
+				scenarios={result.scenarios}
+				personas={result.personas}
+				feedback={result.feedback}
+			/>
 		);
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-6">
-			<Card className="bg-white p-6">
-				<h2 className="text-xl font-bold mb-4 text-primary">Market Entry Strategy Simulator</h2>
-				<p className="text-gray-600 mb-6">
-					Enter your company details and market challenge to generate strategic insights.
-				</p>
+		<div className="container mx-auto px-4 py-8 max-w-2xl">
+			<h1 className="text-4xl font-bold text-center mb-2">Market Entry Simulator</h1>
+			<h2 className="text-xl text-center text-muted-foreground mb-12">
+				Test new markets. Simulate outcomes.
+			</h2>
 
-				<div className="space-y-4">
-					<div>
-						<label htmlFor="companyInfo" className="block font-medium text-gray-700 mb-2">
-							Company Information
-						</label>
-						<textarea
-							id="companyInfo"
-							name="companyInfo"
-							rows={4}
-							className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:ring-primary"
-							placeholder="Describe your company's size, current products, and additional details..."
-							required
-						/>
-					</div>
+			<form onSubmit={handleSubmit}>
+				<Card className="p-6">
+					<div className="space-y-4">
+						<div>
+							<Label htmlFor="companyInfo">Company Information</Label>
+							<Textarea
+								id="companyInfo"
+								value={companyInfo}
+								onChange={(e) => setCompanyInfo(e.target.value)}
+								placeholder="Describe your company, product, or service..."
+								className="mt-1"
+								rows={4}
+							/>
+						</div>
 
-					<div>
-						<label htmlFor="marketChallenge" className="block font-medium text-gray-700 mb-2">
-							Market Challenge
-						</label>
-						<textarea
-							id="marketChallenge"
-							name="marketChallenge"
-							rows={4}
-							className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:ring-primary"
-							placeholder="Describe your current market situation and the challenge you're facing..."
-							required
-						/>
-					</div>
+						<div>
+							<Label htmlFor="marketChallenge">Market Challenge</Label>
+							<Textarea
+								id="marketChallenge"
+								value={marketChallenge}
+								onChange={(e) => setMarketChallenge(e.target.value)}
+								placeholder="Describe the market challenge or opportunity..."
+								className="mt-1"
+								rows={4}
+							/>
+						</div>
 
-					<div>
-						<label htmlFor="apiKey" className="block font-medium text-gray-700 mb-2">
-							OpenAI API Key
-						</label>
-						<input
-							type="password"
-							id="apiKey"
-							name="apiKey"
-							className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-primary focus:ring-primary"
-							placeholder="Enter your OpenAI API key..."
-							required
-						/>
+						<div>
+							<Label htmlFor="apiKey">OpenAI API Key</Label>
+							<div className="relative">
+								<Input
+									id="apiKey"
+									type={showApiKey ? "text" : "password"}
+									value={apiKey}
+									onChange={(e) => setApiKey(e.target.value)}
+									placeholder="sk-..."
+									className="mt-1 pr-10"
+								/>
+								<button
+									type="button"
+									onClick={() => setShowApiKey(!showApiKey)}
+									className="absolute right-2 top-[calc(50%+2px)] transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+								>
+									{showApiKey ? <EyeOff size={20} /> : <Eye size={20} />}
+								</button>
+							</div>
+							{error?.code === "INVALID_API_KEY" && (
+								<p className="text-sm text-destructive mt-1">
+									{error.details || "Please check your API key and try again"}
+								</p>
+							)}
+						</div>
+
+						<Button
+							type="submit"
+							className="w-full"
+							disabled={isLoading || !companyInfo || !marketChallenge || !apiKey}
+						>
+							{isLoading ? "Running Simulation..." : "Run Simulation"}
+						</Button>
 					</div>
+				</Card>
+			</form>
+
+			{error && (
+				<Card className="p-6 mt-8 bg-destructive/10">
+					<p className="text-destructive font-medium">{error.message}</p>
+					{error.details && error.code !== "INVALID_API_KEY" && (
+						<p className="text-destructive/80 text-sm mt-1">{error.details}</p>
+					)}
+				</Card>
+			)}
+
+			{result && !showReport && (
+				<div className="mt-8 space-y-8">
+					<Card className="p-6">
+						<h3 className="text-xl font-semibold mb-4">Raw Simulation Results</h3>
+						<div className="space-y-4">
+							<div>
+								<h4 className="font-medium mb-2">Generated Solutions:</h4>
+								<pre className="whitespace-pre-wrap bg-muted p-4 rounded-lg">
+									{result.scenarios}
+								</pre>
+							</div>
+							<div>
+								<h4 className="font-medium mb-2">Market Personas:</h4>
+								<pre className="whitespace-pre-wrap bg-muted p-4 rounded-lg">
+									{result.personas}
+								</pre>
+							</div>
+							<div>
+								<h4 className="font-medium mb-2">Analysis & Feedback:</h4>
+								<pre className="whitespace-pre-wrap bg-muted p-4 rounded-lg">
+									{result.feedback}
+								</pre>
+							</div>
+							<Button
+								onClick={() => setShowReport(true)}
+								className="w-full"
+							>
+								Generate Report
+							</Button>
+						</div>
+					</Card>
 				</div>
-
-				{error && (
-					<div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-						<p className="text-red-600">{error}</p>
-					</div>
-				)}
-
-				<Button
-					type="submit"
-					className="w-full mt-6"
-					disabled={loading}
-				>
-					{loading ? "Running Simulation..." : "Run Simulation"}
-				</Button>
-			</Card>
-		</form>
+			)}
+		</div>
 	);
 }

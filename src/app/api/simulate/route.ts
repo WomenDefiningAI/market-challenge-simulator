@@ -80,16 +80,17 @@ function validateInput(body: RequestBody): {
  */
 export async function POST(request: Request) {
 	try {
-		// Parse the request body
 		const body = await request.json();
+		const { companyInfo, marketChallenge, apiKey } = body;
 
-		// Validate the request body
-		if (!hasRequiredFields(body)) {
+		// Validate required fields
+		if (!companyInfo || !marketChallenge || !apiKey) {
 			return NextResponse.json(
 				{
 					error: "Missing required fields",
+					code: "VALIDATION_ERROR",
 					details:
-						"Please provide all required fields: companyInfo, marketChallenge, and apiKey",
+						"Please provide company information, market challenge, and API key",
 				},
 				{ status: 400 },
 			);
@@ -109,20 +110,34 @@ export async function POST(request: Request) {
 
 		// Run the simulation
 		const result = await runSimulation({
-			companyInfo: body.companyInfo.trim(),
-			marketChallenge: body.marketChallenge.trim(),
-			apiKey: body.apiKey.trim(),
+			companyInfo,
+			marketChallenge,
+			apiKey,
 		});
 
 		// Return the result
 		return NextResponse.json(result);
-	} catch (error) {
-		console.error("Simulation error:", error);
+	} catch (error: any) {
+		console.error("API Error:", error);
+
+		// Handle SimulationError with specific error codes
+		if (error?.name === "SimulationError") {
+			return NextResponse.json(
+				{
+					error: error.message,
+					code: error.code,
+					details: error.details,
+				},
+				{ status: error.code === "INVALID_API_KEY" ? 401 : 500 },
+			);
+		}
+
+		// Handle other errors
 		return NextResponse.json(
 			{
-				error: "Failed to run simulation",
-				details:
-					error instanceof Error ? error.message : "Unknown error occurred",
+				error: "Internal server error",
+				code: "UNKNOWN_ERROR",
+				details: error?.message || "An unexpected error occurred",
 			},
 			{ status: 500 },
 		);

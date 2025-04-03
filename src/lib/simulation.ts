@@ -1,6 +1,17 @@
 import type { SimulationInput, SimulationResult } from "@/lib/types";
 import OpenAI from "openai";
 
+class SimulationError extends Error {
+	constructor(
+		message: string,
+		public readonly code?: string,
+		public readonly details?: string,
+	) {
+		super(message);
+		this.name = "SimulationError";
+	}
+}
+
 /**
  * Generates 5 high-impact solutions based on company info and market challenge
  */
@@ -45,9 +56,25 @@ IMPORTANT: Focus on providing clear, detailed solutions without any JSON formatt
 		});
 
 		return response.choices[0].message.content || "No solutions generated";
-	} catch (error) {
+	} catch (error: any) {
 		console.error("Error generating business scenarios:", error);
-		throw new Error("Failed to generate business scenarios");
+
+		// Handle OpenAI API specific errors
+		if (error?.error?.type === "invalid_request_error") {
+			if (error.code === "invalid_api_key") {
+				throw new SimulationError(
+					"Invalid API Key",
+					"INVALID_API_KEY",
+					"Please check your OpenAI API key and try again.",
+				);
+			}
+		}
+
+		throw new SimulationError(
+			"Failed to generate business scenarios",
+			"GENERATION_ERROR",
+			error?.message || "An unexpected error occurred",
+		);
 	}
 }
 
@@ -224,6 +251,15 @@ export async function runSimulation(
 		};
 	} catch (error) {
 		console.error("Simulation error:", error);
-		throw new Error("Failed to run simulation");
+
+		if (error instanceof SimulationError) {
+			throw error; // Preserve the error details
+		}
+
+		throw new SimulationError(
+			"Failed to run simulation",
+			"UNKNOWN_ERROR",
+			error instanceof Error ? error.message : "An unexpected error occurred",
+		);
 	}
 }
