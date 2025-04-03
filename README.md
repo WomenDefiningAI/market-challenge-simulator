@@ -2,6 +2,8 @@
 
 A Next.js application that enables business strategists to evaluate new market opportunities by simulating potential solutions and collecting persona feedback using a structured, LLM-powered simulation process.
 
+![Main Application Screen](docs/images/mainscreenexample.png)
+
 ## Overview
 
 The Market Challenge Strategy Simulator helps businesses explore different approaches to market challenges by:
@@ -19,6 +21,13 @@ The Market Challenge Strategy Simulator helps businesses explore different appro
 - Risk analysis with specific breakdowns (market readiness, resource requirements, etc.)
 - Authentic first-person quotes from personas that reflect their background and priorities
 - Interactive results dashboard with feasibility and return scoring
+- Real-time loading state showing interim results as they are generated:
+
+  ![Simulation Loading State](docs/images/loadingstate.png)
+
+- Detailed final report summarizing solutions and feedback:
+
+  ![Final Simulation Report](docs/images/finalreportexample.png)
 
 ## Tech Stack
 
