@@ -1,200 +1,309 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { SimulatorHeader } from "./SimulatorHeader";
 
 interface SimulationReportProps {
-  companyInfo: string;
-  marketChallenge: string;
-  scenarios: string;
-  personas: string;
-  feedback: string;
+	companyInfo: string;
+	marketChallenge: string;
+	scenarios: string;
+	personas: string;
+	feedback: string;
 }
 
-interface SolutionAnalysisProps {
-  title: string;
-  solutionName: string;
-  feasibilityScore: number;
-  returnScore: number;
-  positivePersonas: Array<{ role: string; feedback: string }>;
-  negativePersonas: Array<{ role: string; feedback: string }>;
+interface Solution {
+	title: string;
+	description: string;
+	feasibility: number;
+	return: number;
+	positiveQuotes: string[];
+	concernQuotes: string[];
+	riskLevel?: 'low' | 'medium' | 'high';
+	probability?: 'low' | 'medium' | 'high';
 }
 
-function SolutionAnalysis({
-  title,
-  solutionName,
-  feasibilityScore,
-  returnScore,
-  positivePersonas,
-  negativePersonas,
-}: SolutionAnalysisProps) {
-  return (
-    <Card className="p-6">
-      <h3 className="text-2xl font-semibold mb-4">{title}</h3>
-      <div className="space-y-4">
-        <div>
-          <h4 className="text-lg font-medium mb-2">{solutionName}</h4>
-          <div className="space-y-2">
-            <div>
-              <div className="flex justify-between mb-1">
-                <span>Confidence on Feasibility</span>
-                <span>{feasibilityScore}%</span>
-              </div>
-              <Progress value={feasibilityScore} />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span>Confidence on Return</span>
-                <span>{returnScore}%</span>
-              </div>
-              <Progress value={returnScore} />
-            </div>
-          </div>
-        </div>
+function getSolutionType(solution: Solution, index: number, solutions: Solution[]): {
+	title: string;
+	color: string;
+	bgColor: string;
+	progressColor: string;
+	description: string;
+} {
+	// First solution is always least risky
+	if (index === 0) {
+		return {
+			title: "Least Risky Solution",
+			color: "text-indigo-600",
+			bgColor: "bg-indigo-50",
+			progressColor: "bg-indigo-500",
+			description: "This solution offers the most balanced approach with manageable risks."
+		};
+	}
+	// Second solution is most probable
+	if (index === 1) {
+		return {
+			title: "Most Probable Solution",
+			color: "text-pink-600",
+			bgColor: "bg-pink-50",
+			progressColor: "bg-pink-500",
+			description: "This solution has the highest likelihood of market success."
+		};
+	}
+	// Third solution is wildcard
+	return {
+		title: "Wildcard Solution",
+		color: "text-orange-600",
+		bgColor: "bg-orange-50",
+		progressColor: "bg-orange-500",
+		description: "This solution has transformative potential with higher risk-reward."
+	};
+}
 
-        {/* Persona Feedback */}
-        <div className="mt-6">
-          <h4 className="text-lg font-medium mb-4">Simulated Personas</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Positive Feedback */}
-            <div>
-              <h5 className="font-medium mb-2">Positive Feedback</h5>
-              <ul className="list-disc pl-4 space-y-2">
-                {positivePersonas.map((persona, index) => (
-                  <li key={index}>
-                    {persona.role}: {persona.feedback}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            {/* Negative/Neutral Feedback */}
-            <div>
-              <h5 className="font-medium mb-2">Concerns & Considerations</h5>
-              <ul className="list-disc pl-4 space-y-2">
-                {negativePersonas.map((persona, index) => (
-                  <li key={index}>
-                    {persona.role}: {persona.feedback}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
+function extractSolutions(
+	scenarios: string,
+	personas: string,
+	feedback: string,
+): Solution[] {
+	const solutions: Solution[] = [];
+
+	// Split scenarios into individual solutions
+	const scenarioLines = scenarios.split("\n\n").filter((line) => line.trim());
+
+	for (const scenario of scenarioLines) {
+		// Extract solution name and description
+		const titleMatch = scenario.match(/Solution \d+: ([^-]+)/);
+		const descriptionMatch = scenario.match(/Description: ([^-]+)/);
+
+		if (!titleMatch || !descriptionMatch) continue;
+
+		const title = titleMatch[1].trim();
+		const description = descriptionMatch[1].trim();
+
+		// Extract confidence scores from feedback
+		const confidenceMatch = feedback.match(
+			new RegExp(
+				`${title}[\\s\\S]*?Confidence[^:]*: (\\d+)%[\\s\\S]*?Return[^:]*: (\\d+)%`,
+			),
+		);
+
+		const feasibility = confidenceMatch
+			? Number.parseInt(confidenceMatch[1])
+			: 75;
+		const returnScore = confidenceMatch
+			? Number.parseInt(confidenceMatch[2])
+			: 65;
+
+		// Extract persona feedback
+		const personaLines = personas.split("\n\n").filter((line) => line.trim());
+		const positiveQuotes: string[] = [];
+		const concernQuotes: string[] = [];
+
+		for (const persona of personaLines) {
+			// Look for feedback specifically about this solution
+			if (persona.toLowerCase().includes(title.toLowerCase())) {
+				const lines = persona.split("\n");
+				for (const line of lines) {
+					const cleanLine = line.replace(/^[^:]*:\s*/, "").trim();
+					if (
+						line.toLowerCase().includes("positive") ||
+						line.toLowerCase().includes("advantage") ||
+						line.toLowerCase().includes("benefit")
+					) {
+						positiveQuotes.push(cleanLine);
+					} else if (
+						line.toLowerCase().includes("concern") ||
+						line.toLowerCase().includes("challenge") ||
+						line.toLowerCase().includes("risk")
+					) {
+						concernQuotes.push(cleanLine);
+					}
+				}
+			}
+		}
+
+		// If no specific quotes found, look for general feedback
+		if (positiveQuotes.length === 0 || concernQuotes.length === 0) {
+			const feedbackLines = feedback.split("\n").filter((line) => line.trim());
+			for (const line of feedbackLines) {
+				if (line.toLowerCase().includes(title.toLowerCase())) {
+					const cleanLine = line.replace(/^[^:]*:\s*/, "").trim();
+					if (
+						line.toLowerCase().includes("positive") ||
+						line.toLowerCase().includes("advantage")
+					) {
+						positiveQuotes.push(cleanLine);
+					} else if (
+						line.toLowerCase().includes("concern") ||
+						line.toLowerCase().includes("challenge")
+					) {
+						concernQuotes.push(cleanLine);
+					}
+				}
+			}
+		}
+
+		// Ensure we have at least some quotes
+		if (positiveQuotes.length === 0) {
+			positiveQuotes.push("Solution shows potential for market success");
+		}
+		if (concernQuotes.length === 0) {
+			concernQuotes.push("Implementation details need careful consideration");
+		}
+
+		solutions.push({
+			title,
+			description,
+			feasibility,
+			return: returnScore,
+			positiveQuotes,
+			concernQuotes,
+		});
+	}
+
+	// Sort solutions by multiple criteria
+	const sortedSolutions = solutions.sort((a, b) => {
+		// First sort by feasibility for least risky
+		const feasibilityDiff = b.feasibility - a.feasibility;
+		if (Math.abs(feasibilityDiff) > 10) return feasibilityDiff;
+		
+		// Then by return for most probable
+		const returnDiff = b.return - a.return;
+		if (Math.abs(returnDiff) > 10) return returnDiff;
+		
+		// Finally by combined score for wildcard
+		return (b.return * 0.7 + b.feasibility * 0.3) - (a.return * 0.7 + a.feasibility * 0.3);
+	});
+
+	return sortedSolutions;
 }
 
 export function SimulationReport({
-  companyInfo,
-  marketChallenge,
-  scenarios,
-  personas,
-  feedback,
+	companyInfo,
+	marketChallenge,
+	scenarios,
+	personas,
+	feedback,
 }: SimulationReportProps) {
-  const [showAllSolutions, setShowAllSolutions] = useState(false);
+	const solutions = extractSolutions(scenarios, personas, feedback);
 
-  // Example data - in practice, this would be parsed from the feedback string
-  const analysisData = {
-    leastRisky: {
-      title: "Least Risky Solution",
-      solutionName: "Partnership Program",
-      feasibilityScore: 85,
-      returnScore: 55,
-      positivePersonas: [
-        { role: "Sales Manager", feedback: "Strong potential for market expansion" },
-        { role: "Junior Software Engineer", feedback: "Clear technical implementation path" },
-      ],
-      negativePersonas: [
-        { role: "Director of HR", feedback: "Training requirements may be substantial" },
-        { role: "Sales Manager", feedback: "Initial setup costs could be high" },
-      ],
-    },
-    mostLikely: {
-      title: "Most Likely to Succeed",
-      solutionName: "Digital Upscaling Program",
-      feasibilityScore: 75,
-      returnScore: 80,
-      positivePersonas: [
-        { role: "Sales Manager", feedback: "High demand for digital learning" },
-        { role: "Junior Software Engineer", feedback: "Scalable technical solution" },
-      ],
-      negativePersonas: [
-        { role: "Director of HR", feedback: "Need for continuous content updates" },
-        { role: "Product Manager", feedback: "Complex feature requirements" },
-      ],
-    },
-    wildcard: {
-      title: "Wildcard Solution",
-      solutionName: "Crowdfunding Campaign",
-      feasibilityScore: 60,
-      returnScore: 90,
-      positivePersonas: [
-        { role: "Marketing Director", feedback: "Strong community engagement potential" },
-        { role: "Social Media Manager", feedback: "Viral marketing opportunities" },
-      ],
-      negativePersonas: [
-        { role: "Financial Advisor", feedback: "Unpredictable funding outcomes" },
-        { role: "Risk Manager", feedback: "High dependency on market sentiment" },
-      ],
-    },
-  };
+	return (
+		<div className="min-h-screen bg-white">
+			<div className="max-w-4xl mx-auto p-8 my-8 bg-white rounded-lg shadow-sm">
+				<SimulatorHeader />
 
-  return (
-    <div className="w-full">
-      <SimulatorHeader />
+				{/* Company Overview Section */}
+				<Card className="border border-gray-100 shadow-lg mt-8">
+					<div className="p-8">
+						<div className="grid grid-cols-2 gap-8">
+							<div>
+								<h3 className="text-xl font-semibold mb-4 text-gray-900">Company Profile</h3>
+								<p className="text-lg leading-relaxed bg-gray-50 p-6 rounded-lg text-gray-700">
+									{companyInfo}
+								</p>
+							</div>
+							<div>
+								<h3 className="text-xl font-semibold mb-4 text-gray-900">Market Challenge</h3>
+								<p className="text-lg leading-relaxed bg-gray-50 p-6 rounded-lg text-gray-700">
+									{marketChallenge}
+								</p>
+							</div>
+						</div>
+					</div>
+				</Card>
 
-      <Card className="bg-white/95 backdrop-blur-sm shadow-xl">
-        <div className="p-8">
-          <div className="grid grid-cols-2 gap-8 mb-8">
-            <div>
-              <h3 className="text-xl font-semibold mb-4">Company Profile</h3>
-              <p className="text-lg leading-relaxed bg-muted p-6 rounded-lg">{companyInfo}</p>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold mb-4">Market Challenge</h3>
-              <p className="text-lg leading-relaxed bg-muted p-6 rounded-lg">{marketChallenge}</p>
-            </div>
-          </div>
+				{/* Solutions Sections */}
+				{solutions.map((solution, index) => {
+					const solutionType = getSolutionType(solution, index, solutions);
+					return (
+						<Card 
+							key={`solution-${solution.title}`} 
+							className="border border-gray-100 shadow-lg mb-8"
+						>
+							<div className="p-8">
+								<div className="mb-6">
+									<h2 className={`text-2xl font-bold ${solutionType.color}`}>
+										{solutionType.title}
+									</h2>
+									<p className="text-gray-600 mt-1">{solutionType.description}</p>
+								</div>
 
-          <div className="space-y-8">
-            <section>
-              <h3 className="text-2xl font-semibold mb-6">Market Entry Strategies</h3>
-              <div className="space-y-6">
-                {scenarios.split('\n\n').map((scenario, index) => (
-                  <div key={`scenario-${index}`} className="bg-muted p-6 rounded-lg">
-                    <p className="text-lg leading-relaxed">{scenario}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
+								<h3 className="text-xl font-semibold text-gray-900 mb-2">
+									{solution.title}
+								</h3>
+								<p className="text-lg text-gray-700 mb-6">
+									{solution.description}
+								</p>
 
-            <section>
-              <h3 className="text-2xl font-semibold mb-6">Market Personas</h3>
-              <div className="space-y-6">
-                {personas.split('\n\n').map((persona, index) => (
-                  <div key={`persona-${index}`} className="bg-muted p-6 rounded-lg">
-                    <p className="text-lg leading-relaxed">{persona}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
+								<div className="space-y-4 mb-8">
+									<div>
+										<div className="flex justify-between text-sm mb-2 text-gray-700">
+											<span>Confidence on Feasibility</span>
+											<span className="font-semibold">{solution.feasibility}%</span>
+										</div>
+										<div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+											<div 
+												className={`h-full ${solutionType.progressColor} transition-all duration-500`}
+												style={{ width: `${solution.feasibility}%` }}
+											/>
+										</div>
+									</div>
+									<div>
+										<div className="flex justify-between text-sm mb-2 text-gray-700">
+											<span>Confidence on Return</span>
+											<span className="font-semibold">{solution.return}%</span>
+										</div>
+										<div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+											<div 
+												className={`h-full ${solutionType.progressColor} transition-all duration-500`}
+												style={{ width: `${solution.return}%` }}
+											/>
+										</div>
+									</div>
+								</div>
 
-            <section>
-              <h3 className="text-2xl font-semibold mb-6">Market Analysis & Feedback</h3>
-              <div className="space-y-6">
-                {feedback.split('\n\n').map((feedbackItem, index) => (
-                  <div key={`feedback-${index}`} className="bg-muted p-6 rounded-lg">
-                    <p className="text-lg leading-relaxed">{feedbackItem}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-} 
+								<h4 className="text-lg font-semibold mb-4 text-gray-900">Simulated Personas</h4>
+								<div className="grid grid-cols-2 gap-8">
+									<div>
+										<div className="flex items-center gap-2 text-gray-900 mb-4">
+											<Check size={20} className={solutionType.color} />
+											<h5 className="font-semibold">Positive Feedback</h5>
+										</div>
+										<div className="space-y-4">
+											{solution.positiveQuotes.map((quote) => (
+												<div 
+													key={`positive-${solution.title}-${quote.substring(0, 32)}`} 
+													className={`p-4 rounded-lg ${solutionType.bgColor}`}
+												>
+													<p className={`italic ${solutionType.color}`}>
+														"{quote}"
+													</p>
+												</div>
+											))}
+										</div>
+									</div>
+									<div>
+										<div className="flex items-center gap-2 text-gray-900 mb-4">
+											<MessageCircle size={20} className={solutionType.color} />
+											<h5 className="font-semibold">Concerns & Considerations</h5>
+										</div>
+										<div className="space-y-4">
+											{solution.concernQuotes.map((quote) => (
+												<div 
+													key={`concern-${solution.title}-${quote.substring(0, 32)}`} 
+													className="bg-gray-50 p-4 rounded-lg"
+												>
+													<p className="text-gray-700 italic">"{quote}"</p>
+												</div>
+											))}
+										</div>
+									</div>
+								</div>
+							</div>
+						</Card>
+					);
+				})}
+			</div>
+		</div>
+	);
+}

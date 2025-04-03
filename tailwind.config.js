@@ -15,6 +15,9 @@ module.exports = {
             },
         },
         extend: {
+            fontFamily: {
+                sans: ['var(--font-jakarta)'],
+            },
             colors: {
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
