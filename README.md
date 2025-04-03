@@ -1,5 +1,7 @@
 # Market Challenge Simulator
 
+[**Try the live simulator here!**](https://market-challenge-simulator.vercel.app)
+
 A Next.js application that enables business strategists to evaluate new market opportunities by simulating potential solutions and collecting persona feedback using a structured, LLM-powered simulation process.
 
 ![Main Application Screen](docs/images/mainscreenexample.png)
@@ -81,7 +83,9 @@ The structured output uses delimiter tags (e.g., `[PERSONA_START]`, `[SOLUTION_A
 
 ## Deployment
 
-This project is configured for deployment on Vercel. Simply connect your GitHub repository to Vercel for automatic deployment.
+This project is configured for deployment on Vercel. You can access the live deployment at [market-challenge-simulator.vercel.app](https://market-challenge-simulator.vercel.app).
+
+Simply connect your GitHub repository to Vercel for automatic deployment.
 
 ## Contributing
 
