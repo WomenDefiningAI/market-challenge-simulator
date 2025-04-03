@@ -89,11 +89,15 @@ export function SimulationForm() {
 			}
 
 			setResult(data);
-		} catch (err: any) {
+			// Automatically show report after simulation completes
+			setShowReport(true);
+		} catch (err: unknown) {
+			// Use unknown instead of any for type safety
+			const error = err as { message?: string; code?: string; details?: string };
 			setError({
-				message: err.message || "An error occurred",
-				code: err.code,
-				details: err.details,
+				message: error.message || "An error occurred",
+				code: error.code,
+				details: error.details,
 			});
 		} finally {
 			setIsLoading(false);
@@ -108,6 +112,7 @@ export function SimulationForm() {
 				scenarios={result.scenarios}
 				personas={result.personas}
 				feedback={result.feedback}
+				onBack={() => setShowReport(false)}
 			/>
 		);
 	}
@@ -225,42 +230,6 @@ export function SimulationForm() {
 							<p className="text-red-500 text-sm mt-1">{error.details}</p>
 						)}
 					</Card>
-				)}
-
-				{result && !showReport && (
-					<div className="mt-8 space-y-8">
-						<Card className="border border-gray-100 shadow-lg">
-							<div className="p-8">
-								<h3 className="text-2xl font-semibold mb-6 text-gray-900">Raw Simulation Results</h3>
-								<div className="space-y-6">
-									<div>
-										<h4 className="text-xl font-medium mb-3 text-gray-900">Generated Solutions:</h4>
-										<pre className="whitespace-pre-wrap bg-gray-50 p-6 rounded-lg text-lg text-gray-700">
-											{result.scenarios}
-										</pre>
-									</div>
-									<div>
-										<h4 className="text-xl font-medium mb-3 text-gray-900">Market Personas:</h4>
-										<pre className="whitespace-pre-wrap bg-gray-50 p-6 rounded-lg text-lg text-gray-700">
-											{result.personas}
-										</pre>
-									</div>
-									<div>
-										<h4 className="text-xl font-medium mb-3 text-gray-900">Analysis & Feedback:</h4>
-										<pre className="whitespace-pre-wrap bg-gray-50 p-6 rounded-lg text-lg text-gray-700">
-											{result.feedback}
-										</pre>
-									</div>
-									<Button
-										onClick={() => setShowReport(true)}
-										className="w-full py-6 text-lg bg-indigo-600 hover:bg-indigo-700 text-white"
-									>
-										Generate Report
-									</Button>
-								</div>
-							</div>
-						</Card>
-					</div>
 				)}
 			</div>
 		</div>
