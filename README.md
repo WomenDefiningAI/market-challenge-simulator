@@ -13,7 +13,7 @@ The Market Challenge Strategy Simulator helps businesses explore different appro
 
 ## Features
 
-- AI-powered market analysis using GPT-4
+- AI-powered market analysis using GPT-4o
 - Structured prompt templates with delimiter tags for consistent data extraction
 - Detailed persona generation with demographic details and adoption likelihood
 - Risk analysis with specific breakdowns (market readiness, resource requirements, etc.)
@@ -22,7 +22,7 @@ The Market Challenge Strategy Simulator helps businesses explore different appro
 
 ## Tech Stack
 
-- Next.js 14 (App Router)
+- Next.js
 - TypeScript
 - Tailwind CSS
 - OpenAI API integration
@@ -32,8 +32,8 @@ The Market Challenge Strategy Simulator helps businesses explore different appro
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/WomenDefiningAI/market-entry-simulator.git
-cd market-entry-simulator
+git clone https://github.com/WomenDefiningAI/market-challenge-simulator.git
+cd market-challenge-simulator
 ```
 
 2. Install dependencies:
