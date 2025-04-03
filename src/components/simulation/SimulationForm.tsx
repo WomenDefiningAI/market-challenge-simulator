@@ -26,12 +26,13 @@ interface ErrorDisplay {
 	code?: string;
 }
 
-const SIMULATION_STAGES = [
-	"Analyzing company profile and market challenge...",
-	"Generating potential market entry strategies...",
-	"Creating market personas and stakeholders...",
-	"Simulating market reactions and feedback...",
-	"Compiling final analysis and recommendations..."
+const SIMULATION_STAGES_INFO = [
+	{ id: "scenario_generation", text: "Generating potential market entry strategies...", Icon: ListChecks },
+	{ id: "persona_generation", text: "Creating market personas and stakeholders...", Icon: Users },
+	{ id: "feedback_generation", text: "Simulating market reactions and feedback...", Icon: Activity },
+	{ id: "parsing", text: "Generating final report...", Icon: ListChecks },
+	{ id: "complete", text: "Simulation Complete", Icon: CheckCircle2 },
+	{ id: "error", text: "Simulation Error", Icon: CheckCircle2 }
 ];
 
 export function SimulationForm() {
@@ -127,7 +128,6 @@ export function SimulationForm() {
 
 										console.log("Received SSE:", event.type, event);
 
-										// Update state based on event type
 										switch (event.type) {
 											case "scenario_generation":
 												setCurrentStageId(event.type);
@@ -150,7 +150,7 @@ export function SimulationForm() {
 												break;
 											case "complete":
 												setCurrentStageId(event.type);
-												setCurrentStageMessage("Simulation Complete"); // Set final message
+												setCurrentStageMessage("Simulation Complete");
 												setResult((event as CompletionEvent).data);
 												setShowReport(true);
 												setIsLoading(false);
@@ -169,10 +169,7 @@ export function SimulationForm() {
 								}
 							}
 						}
-						// Keep the last partial message
 						buffer = parts[parts.length - 1];
-
-						// Continue reading
 						processStream();
 						
 					}).catch(streamError => {
@@ -197,12 +194,11 @@ export function SimulationForm() {
 			});
 
 		} catch (err) {
-			console.error("Failed to initiate simulation stream connection:", err);
+			console.error("Unexpected error in handleSubmit:", err);
 			setError({
-				message: "Failed to connect to simulation service.",
+				message: "An unexpected error occurred.",
 			});
 			setIsLoading(false);
-			return;
 		}
 	};
 
@@ -294,35 +290,36 @@ export function SimulationForm() {
 
 								{isLoading && (
 									<div className="mt-6 space-y-4">
-										{SIMULATION_STAGES.filter(s => s !== "Compiling final analysis and recommendations...").map((stage, idx) => {
-											const isActive = currentStageId === stage;
-											const isDone = 
-												SIMULATION_STAGES.findIndex(s => s === currentStageId) > idx || 
-												currentStageId === 'complete';
+										{SIMULATION_STAGES_INFO.filter(s => s.id !== 'complete' && s.id !== 'error').map((stageInfo, idx) => {
+											const currentStageIndex = SIMULATION_STAGES_INFO.findIndex(s => s.id === currentStageId);
+											const isActive = currentStageId === stageInfo.id;
+											const isDone = currentStageIndex > idx;
 											
 											return (
-												<div key={stage} className="transition-opacity duration-500 space-y-2">
+												<div key={stageInfo.id} className="transition-opacity duration-500 space-y-2">
 													<div className={`flex items-center gap-3 ${!isActive && !isDone ? 'opacity-40' : 'opacity-100'}`}>
 														<div className={`w-4 h-4 rounded-full flex-shrink-0 ${isDone ? "bg-pink-500" : isActive ? "bg-indigo-500 animate-pulse" : "bg-gray-200"}`} />
 														<span className={`text-sm ${isDone ? "text-pink-700" : isActive ? "text-indigo-700 font-medium" : "text-gray-500"}`}>
-															{isActive ? currentStageMessage : stage}
+															{isActive ? currentStageMessage : stageInfo.text}
 														</span>
 													</div>
-													<div className="pl-7 text-xs text-gray-600">
-														{stage === 'Generating potential market entry strategies...' && interimTitles.length > 0 && (
-															<ul>{interimTitles.map(t => <li key={t}>- {t}</li>)}</ul>
-														)}
-														{stage === 'Creating market personas and stakeholders...' && interimPersonas.length > 0 && (
-															<ul className="space-y-1">
-																{interimPersonas.map(p => <li key={p.name}>- **{p.name}**: {p.description.substring(0, 70)}...</li>)}
-															</ul>
-														)}
-														{stage === 'Simulating market reactions and feedback...' && interimScores.length > 0 && (
-															<ul className="space-y-1">
-																{interimScores.map(s => <li key={s.title}>- **{s.title}**: Feasibility {s.feasibility}%, Return {s.return}%</li>)}
-															</ul>
-														)}
-													</div>
+													{(isActive || isDone) && (
+														<div className="pl-7 text-xs text-gray-600">
+															{stageInfo.id === 'scenario_generation' && interimTitles.length > 0 && (
+																<ul className="list-disc list-inside">{interimTitles.map(t => <li key={t}>{t}</li>)}</ul>
+															)}
+															{stageInfo.id === 'persona_generation' && interimPersonas.length > 0 && (
+																<ul className="list-disc list-inside space-y-1">
+																	{interimPersonas.map(p => <li key={p.name}><b>{p.name}</b>: {p.description.substring(0, 70)}...</li>)}
+																</ul>
+															)}
+															{stageInfo.id === 'feedback_generation' && interimScores.length > 0 && (
+																<ul className="list-disc list-inside space-y-1">
+																	{interimScores.map(s => <li key={s.title}><b>{s.title}</b>: Feasibility {s.feasibility}%, Return {s.return}%</li>)}
+																</ul>
+															)}
+														</div>
+													)}
 												</div>
 											);
 										})}
