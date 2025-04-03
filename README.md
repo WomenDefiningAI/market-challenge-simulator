@@ -1,4 +1,4 @@
-# Market Entry Strategy Simulator
+# Market Challenge Simulator
 
 A Next.js application that enables business strategists to evaluate new market opportunities by simulating potential solutions and collecting persona feedback using a structured, LLM-powered simulation process.
 
