@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { ParsedSimulationResult } from "@/lib/types";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SimulationReport } from "./SimulationReport";
@@ -32,11 +33,7 @@ export function SimulationForm() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [currentStage, setCurrentStage] = useState(0);
 	const [error, setError] = useState<ErrorDisplay | null>(null);
-	const [result, setResult] = useState<{
-		scenarios: string;
-		personas: string;
-		feedback: string;
-	} | null>(null);
+	const [result, setResult] = useState<ParsedSimulationResult | null>(null);
 	const [showReport, setShowReport] = useState(false);
 
 	// Progress through simulation stages
@@ -78,21 +75,27 @@ export function SimulationForm() {
 				}),
 			});
 
-			const data = await response.json();
+			const data: ParsedSimulationResult | { error: string; code?: string; details?: string } = await response.json();
 
 			if (!response.ok) {
-				throw {
-					message: data.error || "Failed to run simulation",
-					code: data.code,
-					details: data.details,
-				};
+				if ('error' in data && typeof data.error === 'string') {
+					throw {
+						message: data.error,
+						code: 'code' in data ? String(data.code) : undefined,
+						details: 'details' in data ? String(data.details) : undefined,
+					};
+				}
+				throw { message: "Simulation failed with an unexpected response format." };
 			}
 
-			setResult(data);
-			// Automatically show report after simulation completes
-			setShowReport(true);
+			if ('solutions' in data) {
+				setResult(data);
+				setShowReport(true);
+			} else {
+				throw { message: "Received unexpected simulation result format from server." };
+			}
+
 		} catch (err: unknown) {
-			// Use unknown instead of any for type safety
 			const error = err as { message?: string; code?: string; details?: string };
 			setError({
 				message: error.message || "An error occurred",
@@ -104,14 +107,15 @@ export function SimulationForm() {
 		}
 	};
 
-	if (showReport && result) {
+	if (showReport && result && result.solutions) {
 		return (
 			<SimulationReport
 				companyInfo={companyInfo}
 				marketChallenge={marketChallenge}
-				scenarios={result.scenarios}
-				personas={result.personas}
-				feedback={result.feedback}
+				solutions={result.solutions}
+				rawScenarios={result.rawScenarios}
+				rawPersonas={result.rawPersonas}
+				rawFeedback={result.rawFeedback}
 				onBack={() => setShowReport(false)}
 			/>
 		);

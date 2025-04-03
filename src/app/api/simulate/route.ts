@@ -1,5 +1,5 @@
 import { runSimulation } from "@/lib/simulation";
-import type { SimulationInput, SimulationResult } from "@/lib/types";
+import type { ParsedSimulationResult, SimulationInput } from "@/lib/types";
 import { NextResponse } from "next/server";
 
 interface ErrorWithCode {
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 		};
 
 		// Run the simulation
-		const result: SimulationResult = await runSimulation(input);
+		const result: ParsedSimulationResult = await runSimulation(input);
 
 		// Return the simulation result
 		return NextResponse.json(result);
