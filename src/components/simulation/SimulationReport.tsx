@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
+import { SimulatorHeader } from "./SimulatorHeader";
 
 interface SimulationReportProps {
   companyInfo: string;
@@ -142,50 +143,58 @@ export function SimulationReport({
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <h1 className="text-4xl font-bold text-center mb-2">Market Entry Simulator</h1>
-      <h2 className="text-xl text-center text-muted-foreground mb-12">
-        Test new markets. Simulate outcomes.
-      </h2>
+    <div className="w-full">
+      <SimulatorHeader />
 
-      {/* Company Info & Challenge Section */}
-      <Card className="p-6 mb-8">
-        <h3 className="text-2xl font-semibold mb-4">Company Overview</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="text-lg font-medium mb-2">Company Information</h4>
-            <p className="text-muted-foreground whitespace-pre-wrap">{companyInfo}</p>
+      <Card className="bg-white/95 backdrop-blur-sm shadow-xl">
+        <div className="p-8">
+          <div className="grid grid-cols-2 gap-8 mb-8">
+            <div>
+              <h3 className="text-xl font-semibold mb-4">Company Profile</h3>
+              <p className="text-lg leading-relaxed bg-muted p-6 rounded-lg">{companyInfo}</p>
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold mb-4">Market Challenge</h3>
+              <p className="text-lg leading-relaxed bg-muted p-6 rounded-lg">{marketChallenge}</p>
+            </div>
           </div>
-          <div>
-            <h4 className="text-lg font-medium mb-2">Market Challenge</h4>
-            <p className="text-muted-foreground whitespace-pre-wrap">{marketChallenge}</p>
+
+          <div className="space-y-8">
+            <section>
+              <h3 className="text-2xl font-semibold mb-6">Market Entry Strategies</h3>
+              <div className="space-y-6">
+                {scenarios.split('\n\n').map((scenario, index) => (
+                  <div key={`scenario-${index}`} className="bg-muted p-6 rounded-lg">
+                    <p className="text-lg leading-relaxed">{scenario}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <h3 className="text-2xl font-semibold mb-6">Market Personas</h3>
+              <div className="space-y-6">
+                {personas.split('\n\n').map((persona, index) => (
+                  <div key={`persona-${index}`} className="bg-muted p-6 rounded-lg">
+                    <p className="text-lg leading-relaxed">{persona}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <h3 className="text-2xl font-semibold mb-6">Market Analysis & Feedback</h3>
+              <div className="space-y-6">
+                {feedback.split('\n\n').map((feedbackItem, index) => (
+                  <div key={`feedback-${index}`} className="bg-muted p-6 rounded-lg">
+                    <p className="text-lg leading-relaxed">{feedbackItem}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
         </div>
       </Card>
-
-      {/* All Solutions Toggle Section */}
-      <Card className="p-6 mb-8">
-        <Button
-          variant="ghost"
-          className="w-full flex items-center justify-between"
-          onClick={() => setShowAllSolutions(!showAllSolutions)}
-        >
-          <span className="text-lg font-medium">View All Generated Solutions</span>
-          {showAllSolutions ? <ChevronUp /> : <ChevronDown />}
-        </Button>
-        {showAllSolutions && (
-          <div className="mt-4 prose max-w-none whitespace-pre-wrap">
-            {scenarios}
-          </div>
-        )}
-      </Card>
-
-      {/* Analysis Buckets */}
-      <div className="space-y-8">
-        <SolutionAnalysis {...analysisData.leastRisky} />
-        <SolutionAnalysis {...analysisData.mostLikely} />
-        <SolutionAnalysis {...analysisData.wildcard} />
-      </div>
     </div>
   );
 } 
