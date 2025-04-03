@@ -4,7 +4,7 @@ A Next.js application that enables business strategists to evaluate new market o
 
 ## Overview
 
-The Market Entry Strategy Simulator helps businesses explore different approaches to market challenges by:
+The Market Challenge Strategy Simulator helps businesses explore different approaches to market challenges by:
 - Generating multiple potential solutions with varied risk profiles
 - Creating detailed market personas (current audience and potential new audiences)
 - Simulating realistic persona feedback and risk analysis for each solution
