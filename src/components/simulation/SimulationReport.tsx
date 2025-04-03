@@ -24,6 +24,9 @@ interface PersonaFeedback {
 	quote: string;
 	isPersona: boolean;
 	description?: string;
+	age?: string;
+	role?: string;
+	fullPersonaDetails?: string;
 }
 
 interface Solution {
@@ -96,135 +99,356 @@ function getSolutionType(
 	};
 }
 
-function extractPersonas(personas: string): Map<string, { name: string; description: string }> {
-	const personaMap = new Map<string, { name: string; description: string }>();
-	const personaSections = personas.split(/\*\*Persona \d+:|Persona \d+:/i).filter(section => section.trim());
-	
-	for (const section of personaSections) {
-		// Extract name
-		let name = "";
-		let description = "";
-		
-		const nameMatch = section.match(/(?:- )?(?:Name|Basic Information)[^:]*:[^\n]*\n[^-]*- Name:\s*([^\n]+)/i) || 
-		                  section.match(/^(?:\s*)[^-\n]*(?:Name|Basic Information)[^:]*:[^\n]*\n[^-]*(?:\s*)([^\n]+)/i);
-		
-		if (nameMatch?.[1]) {
-			name = nameMatch[1].trim();
-		}
-		
-		// If no name found, try different patterns
-		if (!name) {
-			const altNameMatch = section.match(/^\s*([A-Z][a-z]+)\s*(?:_|$|\n)/);
-			if (altNameMatch?.[1]) {
-				name = altNameMatch[1].trim();
-			}
-		}
-		
-		// Extract background/description
-		if (name) {
-			// Try to find either Background, Context, or Occupation
-			const bgMatch = section.match(/(?:Background|Context)[^:]*:\s*([^\n]+)/i);
-			const occMatch = section.match(/(?:Occupation)[^:]*:\s*([^\n]+)/i);
-			
-			// If background found, use it
-			if (bgMatch?.[1]) {
-				description = bgMatch[1].trim();
-			} 
-			// Otherwise if occupation found, use it
-			else if (occMatch?.[1]) {
-				description = `${name} is a ${occMatch[1].trim()}.`;
-			}
-			
-			if (name && description) {
-				personaMap.set(name.toLowerCase(), { name, description });
-			} else if (name) {
-				personaMap.set(name.toLowerCase(), { name, description: "" });
-			}
-		}
+function extractPersonas(
+	personas: string,
+): Map<
+	string,
+	{
+		name: string;
+		description: string;
+		age?: string;
+		role?: string;
+		fullDetails?: string;
 	}
-	
+> {
+	const personaMap = new Map<
+		string,
+		{
+			name: string;
+			description: string;
+			age?: string;
+			role?: string;
+			fullDetails?: string;
+		}
+	>();
+
+	// Look for delimited persona blocks
+	const personaBlocks = personas
+		.split("[PERSONA_START]")
+		.slice(1)
+		.map((block) => block.split("[PERSONA_END]")[0].trim());
+
+	// If we don't find delimited blocks, fall back to the older pattern matching
+	if (personaBlocks.length === 0) {
+		const personaSections = personas
+			.split(/\*\*Persona \d+:|Persona \d+:/i)
+			.filter((section) => section.trim());
+
+		// Process with the old method
+		for (const section of personaSections) {
+			let name = "";
+			let description = "";
+			let age = "";
+			let role = "";
+			let fullDetails = "";
+
+			// Extract basic information line
+			const basicInfoMatch = section.match(/Basic Information:\s*([^\n]+)/i);
+			if (basicInfoMatch?.[1]) {
+				const basicInfo = basicInfoMatch[1].trim();
+				fullDetails = basicInfo;
+
+				// Parse name, age, role
+				const nameAgeRoleMatch = basicInfo.match(/([^,]+),\s*(\d+),\s*(.+)/);
+				if (nameAgeRoleMatch) {
+					name = nameAgeRoleMatch[1].trim();
+					age = nameAgeRoleMatch[2].trim();
+					role = nameAgeRoleMatch[3].trim();
+				} else {
+					// Fallback to just extract name
+					const nameMatch = basicInfo.match(/([^,]+)/);
+					if (nameMatch) {
+						name = nameMatch[1].trim();
+					}
+				}
+			}
+
+			// If no name found, try other patterns
+			if (!name) {
+				const nameMatch = section.match(/\*\*([^*:]+)(?:\*\*|\()/);
+				if (nameMatch?.[1]) {
+					name = nameMatch[1].trim();
+				}
+			}
+
+			// Extract background/description
+			if (name) {
+				const bgMatch = section.match(
+					/(?:Background|Context)[^:]*:\s*([^\n]+)/i,
+				);
+				if (bgMatch?.[1]) {
+					description = bgMatch[1].trim();
+				}
+
+				personaMap.set(name.toLowerCase(), {
+					name,
+					description,
+					age,
+					role,
+					fullDetails:
+						fullDetails ||
+						`${name}${age ? `, ${age}` : ""}${role ? `, ${role}` : ""}`,
+				});
+			}
+		}
+
+		return personaMap;
+	}
+
+	// Process the new delimited format
+	for (const block of personaBlocks) {
+		// Extract name and audience type from the header
+		const headerMatch = block.match(
+			/\*\*Persona \d+:\s*([^(]+)\s*\(([^)]+)\)\*\*/,
+		);
+		const nameMatch = block.match(/\*\*([^*(]+)(?:\s*\(|\*\*)/);
+		const name = headerMatch?.[1]?.trim() || nameMatch?.[1]?.trim() || "";
+
+		if (!name) continue;
+
+		// Extract age and role from basic information
+		const basicInfoMatch = block.match(
+			/Basic Information:\s*([^,]+),\s*(\d+),\s*(.+?)(?:\n|$)/,
+		);
+		const age = basicInfoMatch?.[2]?.trim() || "";
+		const role = basicInfoMatch?.[3]?.trim() || "";
+
+		// Extract background for description
+		const bgMatch = block.match(/Background and Context:\s*(.+?)(?:\n|$)/);
+		const description = bgMatch?.[1]?.trim() || "";
+
+		// Create the full details string
+		const fullDetails = `${name}, ${age}, ${role}`;
+
+		personaMap.set(name.toLowerCase(), {
+			name,
+			description,
+			age,
+			role,
+			fullDetails,
+		});
+	}
+
 	return personaMap;
 }
 
 function extractPersonaFeedback(
 	analysisText: string,
 	solutionTitle: string,
-	personaMap: Map<string, { name: string; description: string }>
+	personaMap: Map<
+		string,
+		{
+			name: string;
+			description: string;
+			age?: string;
+			role?: string;
+			fullDetails?: string;
+		}
+	>,
 ): { positiveQuotes: PersonaFeedback[]; concernQuotes: PersonaFeedback[] } {
 	const positiveQuotes: PersonaFeedback[] = [];
 	const concernQuotes: PersonaFeedback[] = [];
-	const personaNames = Array.from(personaMap.keys());
 
-	// Find relevant section for this solution
-	const solutionAnalysis = analysisText
-		.split(/Analysis for Solution|---/)
-		.find((section) =>
-			section.toLowerCase().includes(solutionTitle.toLowerCase()),
-		);
+	// Find the solution analysis section
+	const solutionAnalysisBlocks = analysisText
+		.split("[SOLUTION_ANALYSIS_START]")
+		.slice(1)
+		.map((block) => block.split("[SOLUTION_ANALYSIS_END]")[0].trim());
 
-	if (!solutionAnalysis) return { positiveQuotes, concernQuotes };
+	// Look for the specific solution
+	const solutionAnalysis = solutionAnalysisBlocks.find((block) =>
+		block.toLowerCase().includes(solutionTitle.toLowerCase()),
+	);
 
-	// Find the persona feedback section
-	const personaFeedbackSection = solutionAnalysis
-		.split("Persona Feedback")[1]
-		?.split("Overall Analysis")[0];
-
-	if (!personaFeedbackSection) return { positiveQuotes, concernQuotes };
-
-	// Extract individual persona feedback
-	for (const [personaKey, personaInfo] of personaMap.entries()) {
-		const personaSection = personaFeedbackSection
-			.split(/\*\*[^*]+:\*\*|\*\*[^*]+\*\*/)
+	if (!solutionAnalysis) {
+		// Fall back to old method if we can't find the solution with delimiters
+		const oldSolutionAnalysis = analysisText
+			.split(/Analysis for Solution|---/)
 			.find((section) =>
-				section.toLowerCase().includes(personaKey),
+				section.toLowerCase().includes(solutionTitle.toLowerCase()),
 			);
 
-		if (!personaSection) continue;
+		if (!oldSolutionAnalysis) return { positiveQuotes, concernQuotes };
 
-		// Extract sentiment
-		const sentimentMatch = personaSection.match(
-			/Initial reaction and sentiment:\s*([^\\n]+)/,
-		);
-		const sentiment = sentimentMatch?.[1]?.trim() || "";
-		const isPositive = sentiment.toLowerCase().includes("positive");
+		// Try to extract persona feedback without delimiters
+		const personaFeedbackSection = oldSolutionAnalysis
+			.split("Persona Feedback")[1]
+			?.split("Overall Analysis")[0];
 
-		// Extract benefits
-		const benefitsMatch = personaSection.match(
-			/Potential benefits:\s*([^\\n]+)/,
-		);
-		if (benefitsMatch?.[1]) {
-			positiveQuotes.push({
-				name: personaInfo.name,
-				quote: benefitsMatch[1].trim(),
-				isPersona: true,
-				description: personaInfo.description
-			});
+		if (!personaFeedbackSection) return { positiveQuotes, concernQuotes };
+
+		// Extract feedback for each persona
+		for (const [personaKey, personaInfo] of personaMap.entries()) {
+			const personaSection = personaFeedbackSection
+				.split(/\*\*[^*]+:\*\*|\*\*[^*]+\*\*/)
+				.find((section) => section.toLowerCase().includes(personaKey));
+
+			if (!personaSection) continue;
+
+			// Extract sentiment
+			const sentimentMatch = personaSection.match(
+				/Initial reaction:\s*([^.]+)\./,
+			);
+			const sentiment = sentimentMatch?.[1]?.trim() || "";
+			const isPositive = sentiment.toLowerCase().includes("positive");
+
+			// Extract benefits
+			const benefitsMatch = personaSection.match(
+				/Potential benefits:\s*([^.]+)\./,
+			);
+			if (benefitsMatch?.[1]) {
+				const benefit = benefitsMatch[1].trim();
+				// Convert to first-person quote
+				let quote = "";
+
+				if (benefit.includes("hopes for")) {
+					quote = `"I'm really hoping for ${benefit.replace("He hopes for", "").replace("She hopes for", "").replace("sees potential in", "").replace("They hope for", "")}."`;
+				} else if (benefit.includes("sees potential")) {
+					quote = `"I see great potential in ${benefit.replace("He sees potential in", "").replace("She sees potential in", "").replace("They see potential in", "")}."`;
+				} else {
+					quote = `"This would be great because it could provide ${benefit.replace("He may see benefits if", "").replace("She may see benefits if", "").replace("They may see benefits from", "")}."`;
+				}
+
+				positiveQuotes.push({
+					name: personaInfo.name,
+					quote: quote.replace(/\."\.$/, '."'),
+					isPersona: true,
+					description: personaInfo.description,
+					age: personaInfo.age,
+					role: personaInfo.role,
+					fullPersonaDetails: personaInfo.fullDetails,
+				});
+			}
+
+			// Extract concerns
+			const concernsMatch =
+				personaSection.match(/Key concerns:\s*([^.]+)\./) ||
+				personaSection.match(/Key concerns or reservations:\s*([^.]+)\./);
+
+			if (concernsMatch?.[1]) {
+				const concern = concernsMatch[1].trim();
+				// Convert to first-person quote
+				let quote = "";
+
+				if (concern.includes("worries about")) {
+					quote = `"I'm concerned about ${concern.replace("He worries about", "").replace("She worries about", "").replace("They worry about", "")}."`;
+				} else if (concern.includes("concerned about")) {
+					quote = `"I'm worried that ${concern.replace("He is concerned about", "").replace("She is concerned about", "").replace("They are concerned about", "")}."`;
+				} else if (concern.includes("fears")) {
+					quote = `"My biggest worry is that ${concern.replace("He fears", "").replace("She fears", "").replace("They fear", "")}."`;
+				} else {
+					quote = `"I'm hesitant because ${concern}."`;
+				}
+
+				concernQuotes.push({
+					name: personaInfo.name,
+					quote: quote.replace(/\."\.$/, '."'),
+					isPersona: true,
+					description: personaInfo.description,
+					age: personaInfo.age,
+					role: personaInfo.role,
+					fullPersonaDetails: personaInfo.fullDetails,
+				});
+			}
 		}
 
-		// Extract concerns
-		const concernsMatch = personaSection.match(
-			/Key concerns or reservations:\s*([^\\n]+)/,
-		);
-		if (concernsMatch?.[1]) {
-			concernQuotes.push({
-				name: personaInfo.name,
-				quote: concernsMatch[1].trim(),
-				isPersona: true,
-				description: personaInfo.description
-			});
-		}
+		return { positiveQuotes, concernQuotes };
+	}
 
-		// Extract improvements (as positive feedback)
-		const improvementsMatch = personaSection.match(
-			/Suggested improvements:\s*([^\\n]+)/,
+	// Extract persona feedback blocks with the new delimited format
+	const personaBlocks = solutionAnalysis
+		.split("[PERSONA_FEEDBACK_START]")
+		.slice(1)
+		.map((block) => block.split("[PERSONA_FEEDBACK_END]")[0].trim());
+
+	// Process each persona's feedback
+	for (const block of personaBlocks) {
+		// Extract persona name
+		const nameMatch = block.match(/\*\*([^*:]+):\*\*/);
+		if (!nameMatch?.[1]) continue;
+
+		const personaName = nameMatch[1].trim();
+		const personaKey = personaName.toLowerCase();
+
+		// Find the persona in our map
+		const personaInfo =
+			personaMap.get(personaKey) ||
+			// Try to find by partial match if exact match fails
+			Array.from(personaMap.entries()).find(
+				([key, _]) => key.includes(personaKey) || personaKey.includes(key),
+			)?.[1];
+
+		if (!personaInfo) continue;
+
+		// Look for the direct first-person quote
+		const quoteMatch = block.match(
+			/\*\*\[First Person Quote\]:\*\*\s*"([^"]+)"/,
 		);
-		if (improvementsMatch?.[1]) {
-			positiveQuotes.push({
-				name: personaInfo.name,
-				quote: `Suggests: ${improvementsMatch[1].trim()}`,
-				isPersona: true,
-				description: personaInfo.description
-			});
+		const directQuoteMatch = block.match(/\*\*[^*]+:\*\*\s*"([^"]+)"/);
+		const quote = quoteMatch?.[1] || directQuoteMatch?.[1];
+
+		if (quote) {
+			// Determine if it's a positive or concern quote
+			const initialReactionMatch = block.match(/Initial reaction:\s*([^.]+)\./);
+			const sentiment = initialReactionMatch?.[1]?.toLowerCase() || "";
+
+			const isPositive =
+				sentiment.includes("positive") ||
+				(!sentiment.includes("negative") &&
+					(quote.toLowerCase().includes("like") ||
+						quote.toLowerCase().includes("great") ||
+						quote.toLowerCase().includes("benefit") ||
+						quote.toLowerCase().includes("improve")));
+
+			if (isPositive) {
+				positiveQuotes.push({
+					name: personaInfo.name,
+					quote: `"${quote}"`,
+					isPersona: true,
+					description: personaInfo.description,
+					age: personaInfo.age,
+					role: personaInfo.role,
+					fullPersonaDetails: personaInfo.fullDetails,
+				});
+			} else {
+				concernQuotes.push({
+					name: personaInfo.name,
+					quote: `"${quote}"`,
+					isPersona: true,
+					description: personaInfo.description,
+					age: personaInfo.age,
+					role: personaInfo.role,
+					fullPersonaDetails: personaInfo.fullDetails,
+				});
+			}
+		} else {
+			// Fall back to constructing a quote from benefits/concerns if no direct quote
+			const benefitsMatch = block.match(/Potential benefits:\s*([^.]+)\./);
+			const concernsMatch = block.match(/Key concerns:\s*([^.]+)\./);
+
+			if (benefitsMatch?.[1]) {
+				positiveQuotes.push({
+					name: personaInfo.name,
+					quote: `"I see potential in ${benefitsMatch[1].trim()}."`,
+					isPersona: true,
+					description: personaInfo.description,
+					age: personaInfo.age,
+					role: personaInfo.role,
+					fullPersonaDetails: personaInfo.fullDetails,
+				});
+			}
+
+			if (concernsMatch?.[1]) {
+				concernQuotes.push({
+					name: personaInfo.name,
+					quote: `"I'm concerned about ${concernsMatch[1].trim()}."`,
+					isPersona: true,
+					description: personaInfo.description,
+					age: personaInfo.age,
+					role: personaInfo.role,
+					fullPersonaDetails: personaInfo.fullDetails,
+				});
+			}
 		}
 	}
 
@@ -237,160 +461,287 @@ function extractSolutions(
 	feedback: string,
 ): Solution[] {
 	const solutions: Solution[] = [];
-	
+
 	// Extract persona details with descriptions
 	const personaMap = extractPersonas(personas);
 
-	// Add persona names from the analysis feedback that might not be in the personas section
-	const additionalPersonas = feedback.match(/\*\*([A-Z][a-z]+):\*\*/g);
-	if (additionalPersonas) {
-		for (const persona of additionalPersonas) {
-			const name = persona.replace(/\*\*/g, "").replace(":", "").trim();
-			if (name && name.length > 1 && !personaMap.has(name.toLowerCase())) {
-				personaMap.set(name.toLowerCase(), { name, description: "" });
-			}
-		}
-	}
+	// Check if the feedback uses the new delimited format
+	const solutionAnalysisBlocks = feedback
+		.split("[SOLUTION_ANALYSIS_START]")
+		.slice(1)
+		.map((block) => block.split("[SOLUTION_ANALYSIS_END]")[0].trim());
 
-	// Get numbered solutions from scenarios
-	const scenarioSections = scenarios.split(/(Solution \d+:|Strategy \d+:)/);
-	const currentSolution = "";
-	const solutionDescription = "";
-
-	for (let i = 1; i < scenarioSections.length; i += 2) {
-		if (i + 1 >= scenarioSections.length) break;
-
-		const titleLine = scenarioSections[i].trim();
-		const contentSection = scenarioSections[i + 1].trim();
-
-		// Extract the solution name and description
-		const titleMatch = titleLine.match(/(Solution|Strategy) \d+:\s*(.*?)$/);
-		if (!titleMatch) continue;
-
-		const title = titleMatch[2].trim();
-
-		// Find the description in the content
-		const descriptionMatch = contentSection.match(
-			/- Description:\s*(.*?)(?=\n- [A-Z]|$)/s,
-		);
-		const description = descriptionMatch
-			? descriptionMatch[1].trim()
-			: "No description available";
-
-		// Extract confidence scores from feedback
-		let feasibility = 75;
-		let returnScore = 65;
-
-		// Look for risk scores in the analysis
-		const riskMatch = feedback.match(
-			new RegExp(
-				`Analysis for Solution[^-]*${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?Market readiness:\\s*(\\d+)%`,
-				"i",
-			),
-		);
-
-		const returnMatch = feedback.match(
-			new RegExp(
-				`Analysis for Solution[^-]*${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?Resource requirements:\\s*(\\d+)%`,
-				"i",
-			),
-		);
-
-		if (riskMatch?.[1]) {
-			feasibility = Number.parseInt(riskMatch[1]);
-		}
-
-		if (returnMatch?.[1]) {
-			// Resource requirements is inverse to return score (lower requirements = higher return)
-			const resourceRequirements = Number.parseInt(returnMatch[1]);
-			returnScore = 100 - resourceRequirements; // Invert the score
-		}
-
-		// Get persona feedback for this solution
-		const { positiveQuotes, concernQuotes } = extractPersonaFeedback(
-			feedback,
-			title,
-			personaMap,
-		);
-
-		// Add some analysis insights if we don't have enough persona feedback
-		if (positiveQuotes.length < 2 || concernQuotes.length < 1) {
-			// Extract advantages from the solution description
-			const advantagesMatch = contentSection.match(
-				/- Advantages:\s*([\s\S]*?)(?=\n- [A-Z]|$)/,
+	// If we have structured blocks, process them
+	if (solutionAnalysisBlocks.length > 0) {
+		for (const block of solutionAnalysisBlocks) {
+			// Extract solution title
+			const titleMatch = block.match(
+				/Analysis for Solution \d+:\s*(.+?)(?:\n|$)/,
 			);
-			if (advantagesMatch?.[1]) {
-				const advantages = advantagesMatch[1]
-					.split(/\n\s*-\s*/)
-					.filter((adv) => adv.trim().length > 0)
-					.map((adv) => adv.trim());
+			if (!titleMatch?.[1]) continue;
 
-				for (
-					let j = 0;
-					j < advantages.length && positiveQuotes.length < 5;
-					j++
-				) {
-					if (advantages[j] && advantages[j].length > 5) {
-						positiveQuotes.push({
-							name: "Key Insight",
-							quote: advantages[j],
-							isPersona: false,
-						});
+			const title = titleMatch[1].trim();
+
+			// Extract risk scores
+			const riskMatch = block.match(/Risk Score:\s*(\d+)%/);
+			const marketReadinessMatch = block.match(/Market readiness:\s*(\d+)%/);
+			const resourceRequirementsMatch = block.match(
+				/Resource requirements:\s*(\d+)%/,
+			);
+
+			// Calculate feasibility (invert risk score) and return
+			let feasibility = 75;
+			let returnScore = 65;
+
+			if (riskMatch?.[1]) {
+				const riskScore = Number.parseInt(riskMatch[1]);
+				if (!Number.isNaN(riskScore)) {
+					feasibility = 100 - riskScore; // Invert risk score for feasibility
+				}
+			}
+
+			if (marketReadinessMatch?.[1]) {
+				const marketReadiness = Number.parseInt(marketReadinessMatch[1]);
+				if (!Number.isNaN(marketReadiness)) {
+					// Blend the market readiness with feasibility
+					feasibility = Math.round(feasibility * 0.6 + marketReadiness * 0.4);
+				}
+			}
+
+			if (resourceRequirementsMatch?.[1]) {
+				const resourceRequirements = Number.parseInt(
+					resourceRequirementsMatch[1],
+				);
+				if (!Number.isNaN(resourceRequirements)) {
+					// Use inverted resource requirements
+					returnScore = Math.round(100 - resourceRequirements);
+				}
+			}
+
+			// Find description in the scenarios
+			let description = "No description available";
+			const scenarioMatch = scenarios.match(
+				new RegExp(
+					`Solution \\d+:\\s*${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?- Description:\\s*([^\\n]+)`,
+					"i",
+				),
+			);
+			if (scenarioMatch?.[1]) {
+				description = scenarioMatch[1].trim();
+			}
+
+			// Get persona feedback
+			const { positiveQuotes, concernQuotes } = extractPersonaFeedback(
+				feedback,
+				title,
+				personaMap,
+			);
+
+			// Ensure we have at least some quotes
+			if (positiveQuotes.length === 0) {
+				positiveQuotes.push({
+					name: "Analysis",
+					quote: `"${title} offers significant market potential."`,
+					isPersona: false,
+				});
+			}
+
+			if (concernQuotes.length === 0) {
+				concernQuotes.push({
+					name: "Consideration",
+					quote: `"Implementation details need careful consideration."`,
+					isPersona: false,
+				});
+			}
+
+			solutions.push({
+				title,
+				description,
+				feasibility,
+				return: returnScore,
+				positiveQuotes,
+				concernQuotes,
+			});
+		}
+	} else {
+		// Fall back to the old extraction method
+		// Get numbered solutions from scenarios
+		const scenarioSections = scenarios.split(/(Solution \d+:|Strategy \d+:)/);
+
+		for (let i = 1; i < scenarioSections.length; i += 2) {
+			if (i + 1 >= scenarioSections.length) break;
+
+			const titleLine = scenarioSections[i].trim();
+			const contentSection = scenarioSections[i + 1].trim();
+
+			// Extract the solution name and description
+			const titleMatch = titleLine.match(/(Solution|Strategy) \d+:\s*(.*?)$/);
+			if (!titleMatch) continue;
+
+			const title = titleMatch[2].trim();
+
+			// Find the description in the content
+			const descriptionMatch = contentSection.match(
+				/- Description:\s*(.*?)(?=\n- [A-Z]|$)/s,
+			);
+			const description = descriptionMatch
+				? descriptionMatch[1].trim()
+				: "No description available";
+
+			// Extract confidence scores from feedback by finding the analysis section for this solution
+			const solutionNumber = titleLine.match(/\d+/)?.[0] || "";
+
+			// Find the specific analysis section for this solution
+			const analysisPattern = new RegExp(
+				`Analysis for Solution ${solutionNumber}[^-]*${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\n\\nRisk Score: (\\d+)%`,
+				"i",
+			);
+			const analysisSection = feedback.match(analysisPattern);
+
+			// Default values if we can't find specific scores
+			let feasibility = 75;
+			let returnScore = 65;
+
+			if (analysisSection) {
+				// Extract the overall risk score - lower risk means higher feasibility
+				const riskScore = Number.parseInt(analysisSection[1]);
+				if (!Number.isNaN(riskScore)) {
+					feasibility = 100 - riskScore; // Invert risk score for feasibility
+				}
+
+				// Find the specific section for this solution by exact title
+				const solutionAnalysis = feedback
+					.split(/Analysis for Solution \d+:|---/)
+					.find((section) =>
+						section.toLowerCase().includes(title.toLowerCase()),
+					);
+
+				if (solutionAnalysis) {
+					// Extract market readiness for this specific solution
+					const marketReadinessMatch = solutionAnalysis.match(
+						/Market readiness:\s*(\d+)%/,
+					);
+					const resourceRequirementsMatch = solutionAnalysis.match(
+						/Resource requirements:\s*(\d+)%/,
+					);
+
+					if (marketReadinessMatch?.[1]) {
+						// Use market readiness as a component of feasibility
+						const marketReadiness = Number.parseInt(marketReadinessMatch[1]);
+						if (!Number.isNaN(marketReadiness)) {
+							// Blend the market readiness with inverted risk score
+							feasibility = Math.round(
+								feasibility * 0.6 + marketReadiness * 0.4,
+							);
+						}
+					}
+
+					if (resourceRequirementsMatch?.[1]) {
+						// Calculate return based on resource requirements (inverse)
+						const resourceRequirements = Number.parseInt(
+							resourceRequirementsMatch[1],
+						);
+						if (!Number.isNaN(resourceRequirements)) {
+							// Use inverted resource requirements but add some variability
+							returnScore = Math.round(100 - resourceRequirements);
+
+							// Add some variability based on risk score too
+							const riskComponent = (100 - riskScore) * 0.3;
+							returnScore = Math.min(
+								95,
+								Math.max(35, Math.round(returnScore * 0.7 + riskComponent)),
+							);
+						}
 					}
 				}
 			}
 
-			// Extract challenges from the solution description
-			const challengesMatch = contentSection.match(
-				/- Challenges:\s*([\s\S]*?)(?=\n- [A-Z]|$)/,
+			// Get persona feedback for this solution
+			const { positiveQuotes, concernQuotes } = extractPersonaFeedback(
+				feedback,
+				title,
+				personaMap,
 			);
-			if (challengesMatch?.[1]) {
-				const challenges = challengesMatch[1]
-					.split(/\n\s*-\s*/)
-					.filter((chal) => chal.trim().length > 0)
-					.map((chal) => chal.trim());
 
-				for (
-					let j = 0;
-					j < challenges.length && concernQuotes.length < 3;
-					j++
-				) {
-					if (challenges[j] && challenges[j].length > 5) {
-						concernQuotes.push({
-							name: "Consideration",
-							quote: challenges[j],
-							isPersona: false,
-						});
+			// Add some analysis insights if we don't have enough persona feedback
+			if (positiveQuotes.length < 2 || concernQuotes.length < 1) {
+				// Extract advantages from the solution description
+				const advantagesMatch = contentSection.match(
+					/- Advantages:\s*([\s\S]*?)(?=\n- [A-Z]|$)/,
+				);
+				if (advantagesMatch?.[1]) {
+					const advantages = advantagesMatch[1]
+						.split(/\n\s*-\s*/)
+						.filter((adv) => adv.trim().length > 0)
+						.map((adv) => adv.trim());
+
+					for (
+						let j = 0;
+						j < advantages.length && positiveQuotes.length < 5;
+						j++
+					) {
+						if (advantages[j] && advantages[j].length > 5) {
+							positiveQuotes.push({
+								name: "Key Insight",
+								quote: `"${advantages[j]}"`,
+								isPersona: false,
+							});
+						}
+					}
+				}
+
+				// Extract challenges from the solution description
+				const challengesMatch = contentSection.match(
+					/- Challenges:\s*([\s\S]*?)(?=\n- [A-Z]|$)/,
+				);
+				if (challengesMatch?.[1]) {
+					const challenges = challengesMatch[1]
+						.split(/\n\s*-\s*/)
+						.filter((chal) => chal.trim().length > 0)
+						.map((chal) => chal.trim());
+
+					for (
+						let j = 0;
+						j < challenges.length && concernQuotes.length < 3;
+						j++
+					) {
+						if (challenges[j] && challenges[j].length > 5) {
+							concernQuotes.push({
+								name: "Consideration",
+								quote: `"${challenges[j]}"`,
+								isPersona: false,
+							});
+						}
 					}
 				}
 			}
-		}
 
-		// Ensure we have at least some insights
-		if (positiveQuotes.length === 0) {
-			positiveQuotes.push({
-				name: "Analysis",
-				quote: `${title} offers significant market potential.`,
-				isPersona: false,
+			// Ensure we have at least some insights
+			if (positiveQuotes.length === 0) {
+				positiveQuotes.push({
+					name: "Analysis",
+					quote: `"${title} offers significant market potential."`,
+					isPersona: false,
+				});
+			}
+
+			if (concernQuotes.length === 0) {
+				concernQuotes.push({
+					name: "Consideration",
+					quote: `"Implementation details need careful consideration."`,
+					isPersona: false,
+				});
+			}
+
+			solutions.push({
+				title,
+				description,
+				feasibility,
+				return: returnScore,
+				positiveQuotes,
+				concernQuotes,
 			});
 		}
-
-		if (concernQuotes.length === 0) {
-			concernQuotes.push({
-				name: "Consideration",
-				quote: "Implementation details need careful consideration.",
-				isPersona: false,
-			});
-		}
-
-		solutions.push({
-			title,
-			description,
-			feasibility,
-			return: returnScore,
-			positiveQuotes,
-			concernQuotes,
-		});
 	}
 
 	// Sort solutions by multiple criteria
@@ -424,9 +775,9 @@ export function SimulationReport({
 
 				{/* Back button if onBack is provided */}
 				{onBack && (
-					<Button 
-						onClick={onBack} 
-						variant="outline" 
+					<Button
+						onClick={onBack}
+						variant="outline"
 						className="mb-4 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
 					>
 						← Back to Form
@@ -531,7 +882,7 @@ export function SimulationReport({
 													className={`p-4 rounded-lg ${solutionType.bgColor}`}
 												>
 													<p className={`italic ${solutionType.color}`}>
-														"{item.quote}"
+														{item.quote}
 													</p>
 													<div className="flex items-center gap-2 mt-2 text-gray-700">
 														{item.isPersona ? (
@@ -540,9 +891,11 @@ export function SimulationReport({
 															<Check size={14} />
 														)}
 														<span className="text-sm font-medium">
-															{item.isPersona
-																? `${item.name} (Persona)`
-																: item.name}
+															{item.isPersona && item.fullPersonaDetails
+																? item.fullPersonaDetails
+																: item.isPersona
+																	? `${item.name}${item.age ? `, ${item.age}` : ""}${item.role ? `, ${item.role}` : ""}`
+																	: item.name}
 														</span>
 													</div>
 													{item.isPersona && item.description && (
@@ -567,7 +920,7 @@ export function SimulationReport({
 													key={`concern-${solution.title}-${i}`}
 													className="bg-gray-50 p-4 rounded-lg"
 												>
-													<p className="text-gray-700 italic">"{item.quote}"</p>
+													<p className="text-gray-700 italic">{item.quote}</p>
 													<div className="flex items-center gap-2 mt-2 text-gray-700">
 														{item.isPersona ? (
 															<User size={14} className="text-indigo-500" />
@@ -575,9 +928,11 @@ export function SimulationReport({
 															<MessageCircle size={14} />
 														)}
 														<span className="text-sm font-medium">
-															{item.isPersona
-																? `${item.name} (Persona)`
-																: item.name}
+															{item.isPersona && item.fullPersonaDetails
+																? item.fullPersonaDetails
+																: item.isPersona
+																	? `${item.name}${item.age ? `, ${item.age}` : ""}${item.role ? `, ${item.role}` : ""}`
+																	: item.name}
 														</span>
 													</div>
 													{item.isPersona && item.description && (
@@ -610,23 +965,29 @@ export function SimulationReport({
 								<ChevronDown className="h-5 w-5 text-gray-600" />
 							)}
 						</button>
-						
+
 						{showRawData && (
 							<div className="mt-6 space-y-6">
 								<div>
-									<h4 className="text-base font-medium mb-3 text-gray-900">Generated Solutions:</h4>
+									<h4 className="text-base font-medium mb-3 text-gray-900">
+										Generated Solutions:
+									</h4>
 									<pre className="whitespace-pre-wrap bg-gray-50 p-6 rounded-lg text-sm text-gray-700 max-h-[300px] overflow-y-auto">
 										{scenarios}
 									</pre>
 								</div>
 								<div>
-									<h4 className="text-base font-medium mb-3 text-gray-900">Market Personas:</h4>
+									<h4 className="text-base font-medium mb-3 text-gray-900">
+										Market Personas:
+									</h4>
 									<pre className="whitespace-pre-wrap bg-gray-50 p-6 rounded-lg text-sm text-gray-700 max-h-[300px] overflow-y-auto">
 										{personas}
 									</pre>
 								</div>
 								<div>
-									<h4 className="text-base font-medium mb-3 text-gray-900">Analysis & Feedback:</h4>
+									<h4 className="text-base font-medium mb-3 text-gray-900">
+										Analysis & Feedback:
+									</h4>
 									<pre className="whitespace-pre-wrap bg-gray-50 p-6 rounded-lg text-sm text-gray-700 max-h-[300px] overflow-y-auto">
 										{feedback}
 									</pre>

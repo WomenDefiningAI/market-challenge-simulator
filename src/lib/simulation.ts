@@ -93,24 +93,28 @@ ${input.companyInfo}
 Market Challenge:
 ${input.marketChallenge}
 
-Generate 6 personas that include:
-1. Basic information (name, age, occupation)
-2. Background and context
-3. Key characteristics
-4. Goals and objectives
-5. Pain points and challenges
-6. Tech savviness level
-7. Market segment (Early Adopter or Mainstream)
-8. Adoption likelihood (0-1)
+Generate 6 personas following this EXACT format:
 
-Format each persona clearly with:
-- A numbered heading (e.g., "Persona 1: [Name]")
-- Clear sections for each piece of information
-- Bullet points for lists
-- Include their market segment and adoption likelihood at the top
-- Clearly label which personas are from current audience vs. new audiences
+[PERSONA_START]
+**Persona 1: [Full Name] (Current Audience)**
+- Basic Information: [Full Name], [Age], [Specific Job Title/Role]
+- Background and Context: [2-3 sentences describing their situation]
+- Key Characteristics: [3-5 bullet points of personality traits]
+- Goals and Objectives: [What they want to achieve]
+- Pain Points and Challenges: [What problems they face]
+- Tech Savviness Level: [High/Medium/Low]
+- Market Segment: [Early Adopter/Mainstream]
+- Adoption Likelihood: [0-1, to one decimal place]
+[PERSONA_END]
 
-IMPORTANT: Focus on providing clear, detailed personas without any JSON formatting.`;
+Repeat the [PERSONA_START]...[PERSONA_END] format for all 6 personas.
+
+IMPORTANT:
+1. Make the first 3 personas from current audience and the next 3 from new potential audiences
+2. Include FULL NAME, AGE, and SPECIFIC ROLE for each persona
+3. Make personas diverse and realistic with specific details
+4. Give detailed background context that explains their relationship to the product/market
+5. Format EXACTLY as shown with the delimiter tags`;
 
 	try {
 		const response = await client.chat.completions.create({
@@ -119,7 +123,7 @@ IMPORTANT: Focus on providing clear, detailed personas without any JSON formatti
 				{
 					role: "system",
 					content:
-						"You are a market research expert specializing in user personas. Create detailed, realistic personas that represent different market segments.",
+						"You are a market research expert specializing in user personas. Create detailed, realistic personas that represent different market segments. Follow the specified format exactly.",
 				},
 				{ role: "user", content: prompt },
 			],
@@ -150,52 +154,61 @@ ${solutions}
 PERSONAS:
 ${personas}
 
-For EACH of the 5 solutions, provide a complete analysis following this structure:
+For EACH of the 5 solutions, provide a complete analysis following this EXACT format:
 
-1. Solution Analysis Header:
-   "Analysis for Solution [N]: [Title]"
+[SOLUTION_ANALYSIS_START]
+Analysis for Solution [N]: [Title]
 
-2. Risk Score (0-100%) with breakdown:
-   - Market readiness
-   - Resource requirements
-   - Competitive landscape
-   - Technical complexity
-   - Regulatory considerations
+Risk Score: [0-100]%
+- Market readiness: [0-100]% ([brief explanation])
+- Resource requirements: [0-100]% ([brief explanation])
+- Competitive landscape: [0-100]% ([brief explanation])
+- Technical complexity: [0-100]% ([brief explanation])
+- Regulatory considerations: [0-100]% ([brief explanation])
 
-3. Persona Feedback for ALL 6 personas:
-   For each persona (both current and new):
-   - Initial reaction and sentiment
-   - Key concerns or reservations
-   - Potential benefits they see
-   - Likelihood of adoption (0-1)
-   - Suggested improvements from their perspective
+[PERSONA_FEEDBACK_START]
+**[Persona Name]:**
+- Initial reaction: [Positive/Neutral/Negative]. 
+- Key concerns: [Write a clear concern that this persona would have, written from an analytical perspective]
+- Potential benefits: [Write a clear benefit that this persona would see in this solution, written from an analytical perspective]
+- Likelihood of adoption: [0-1]
+- Suggested improvements: [What this persona would suggest to improve the solution]
 
-4. Overall Analysis:
-   - Primary risks and mitigation strategies
-   - Key success factors
-   - Recommended implementation approach
-   - Timeline considerations
-   - Resource requirements
+**[First Person Quote]:** "[Write a DIRECT FIRST-PERSON QUOTE as if the persona is speaking directly - this should sound like something a real person would say, not an analysis. Example: 'I really like how this solution addresses my need for better scheduling tools, but I'm concerned about the learning curve.']"
+[PERSONA_FEEDBACK_END]
 
-5. Solution Comparison:
-   After analyzing all 5 solutions, provide:
-   - Ranking of solutions by risk score (lowest to highest)
-   - Ranking of solutions by overall potential (highest to lowest)
-   - Key differentiators between solutions
-   - Recommendations for implementation priority
+Repeat the [PERSONA_FEEDBACK_START]...[PERSONA_FEEDBACK_END] section for EACH persona.
 
-Format Requirements:
-- Use clear headings and subheadings
-- Use bullet points for lists
-- Separate each solution's analysis with "---"
-- Include ALL 5 solutions in the analysis
-- End with a comprehensive comparison of all solutions
+Overall Analysis:
+- Primary risks: [list key risks]
+- Mitigation strategies: [list strategies]
+- Key success factors: [list factors]
+- Recommended implementation approach: [approach]
+- Timeline considerations: [timeframe]
+- Resource requirements: [resources needed]
+[SOLUTION_ANALYSIS_END]
 
-IMPORTANT: 
-- You MUST analyze ALL 5 solutions completely
-- Do not skip any solutions
-- Provide the full analysis for each solution before moving to the next
-- Include the final comparison section after all individual analyses`;
+Repeat the entire [SOLUTION_ANALYSIS_START]...[SOLUTION_ANALYSIS_END] block for each solution.
+
+After analyzing all solutions, provide:
+
+[COMPARISON_START]
+Solution Comparison:
+- Ranking of solutions by risk score (lowest to highest): [ordered list]
+- Ranking of solutions by overall potential (highest to lowest): [ordered list]
+- Key differentiators between solutions: [list differences]
+- Recommendations for implementation priority: [ordered list]
+[COMPARISON_END]
+
+IMPORTANT REQUIREMENTS: 
+1. You MUST analyze ALL solutions completely
+2. Format EXACTLY as shown with the delimiter tags
+3. EVERY persona MUST have a direct first-person quote that sounds authentic
+4. Quotes should be specific to the solution and the persona's background
+5. Use REALISTIC first-person language for quotes, not analytical summaries
+6. Include the persona's NAME, AGE, and ROLE in the analysis
+7. Make the quotes varied and diverse - some positive, some with concerns
+8. Do NOT use generic quotes - be specific to solution features and persona needs`;
 
 	try {
 		const response = await client.chat.completions.create({
@@ -204,7 +217,7 @@ IMPORTANT:
 				{
 					role: "system",
 					content:
-						"You are a market research expert analyzing solution viability and persona reactions. Provide detailed, realistic feedback and risk analysis for ALL solutions. Do not skip any solutions.",
+						"You are a market research expert analyzing solution viability and persona reactions. Your task is to provide detailed, realistic feedback including authentic-sounding first-person quotes from each persona. Make each quote specific to the solution features and the persona's background. Format your response exactly as specified with the delimiter tags.",
 				},
 				{ role: "user", content: prompt },
 			],
@@ -213,7 +226,7 @@ IMPORTANT:
 		});
 
 		return response.choices[0].message.content || "No feedback generated";
-	} catch (error) {
+	} catch (error: unknown) {
 		console.error("Error generating persona feedback:", error);
 		throw new Error("Failed to generate persona feedback");
 	}
